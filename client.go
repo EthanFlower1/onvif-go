@@ -43,6 +43,25 @@ type Client struct {
 	ptzEndpoint     string
 	imagingEndpoint string
 	eventEndpoint   string
+
+	// Extended service endpoints
+	recordingEndpoint        string
+	searchEndpoint           string
+	replayEndpoint           string
+	receiverEndpoint         string
+	analyticsEndpoint        string
+	media2Endpoint           string
+	accessControlEndpoint    string
+	doorControlEndpoint      string
+	credentialEndpoint       string
+	scheduleEndpoint         string
+	authBehaviorEndpoint     string
+	advancedSecurityEndpoint string
+	thermalEndpoint          string
+	displayEndpoint          string
+	provisioningEndpoint     string
+	uplinkEndpoint           string
+	appmgmtEndpoint          string
 }
 
 // ClientOption is a functional option for configuring the Client.
@@ -225,6 +244,57 @@ func (c *Client) Initialize(ctx context.Context) error {
 func (c *Client) Endpoint() string {
 	return c.endpoint
 }
+
+// HasRecordingService returns true if the recording service endpoint is available.
+func (c *Client) HasRecordingService() bool { return c.recordingEndpoint != "" }
+
+// HasSearchService returns true if the search service endpoint is available.
+func (c *Client) HasSearchService() bool { return c.searchEndpoint != "" }
+
+// HasReplayService returns true if the replay service endpoint is available.
+func (c *Client) HasReplayService() bool { return c.replayEndpoint != "" }
+
+// HasReceiverService returns true if the receiver service endpoint is available.
+func (c *Client) HasReceiverService() bool { return c.receiverEndpoint != "" }
+
+// HasAnalyticsService returns true if the analytics service endpoint is available.
+func (c *Client) HasAnalyticsService() bool { return c.analyticsEndpoint != "" }
+
+// HasMedia2Service returns true if the media2 service endpoint is available.
+func (c *Client) HasMedia2Service() bool { return c.media2Endpoint != "" }
+
+// HasAccessControlService returns true if the access control service endpoint is available.
+func (c *Client) HasAccessControlService() bool { return c.accessControlEndpoint != "" }
+
+// HasDoorControlService returns true if the door control service endpoint is available.
+func (c *Client) HasDoorControlService() bool { return c.doorControlEndpoint != "" }
+
+// HasCredentialService returns true if the credential service endpoint is available.
+func (c *Client) HasCredentialService() bool { return c.credentialEndpoint != "" }
+
+// HasScheduleService returns true if the schedule service endpoint is available.
+func (c *Client) HasScheduleService() bool { return c.scheduleEndpoint != "" }
+
+// HasAuthBehaviorService returns true if the authentication behavior service endpoint is available.
+func (c *Client) HasAuthBehaviorService() bool { return c.authBehaviorEndpoint != "" }
+
+// HasAdvancedSecurityService returns true if the advanced security service endpoint is available.
+func (c *Client) HasAdvancedSecurityService() bool { return c.advancedSecurityEndpoint != "" }
+
+// HasThermalService returns true if the thermal service endpoint is available.
+func (c *Client) HasThermalService() bool { return c.thermalEndpoint != "" }
+
+// HasDisplayService returns true if the display service endpoint is available.
+func (c *Client) HasDisplayService() bool { return c.displayEndpoint != "" }
+
+// HasProvisioningService returns true if the provisioning service endpoint is available.
+func (c *Client) HasProvisioningService() bool { return c.provisioningEndpoint != "" }
+
+// HasUplinkService returns true if the uplink service endpoint is available.
+func (c *Client) HasUplinkService() bool { return c.uplinkEndpoint != "" }
+
+// HasAppMgmtService returns true if the application management service endpoint is available.
+func (c *Client) HasAppMgmtService() bool { return c.appmgmtEndpoint != "" }
 
 // SetCredentials updates the authentication credentials.
 func (c *Client) SetCredentials(username, password string) {
