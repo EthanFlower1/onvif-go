@@ -13,13 +13,30 @@ const CaptureVersion = "2.0"
 type ServiceType string
 
 const (
-	ServiceDevice   ServiceType = "Device"
-	ServiceMedia    ServiceType = "Media"
-	ServicePTZ      ServiceType = "PTZ"
-	ServiceImaging  ServiceType = "Imaging"
-	ServiceEvent    ServiceType = "Event"
-	ServiceDeviceIO ServiceType = "DeviceIO"
-	ServiceUnknown  ServiceType = "Unknown"
+	ServiceDevice           ServiceType = "Device"
+	ServiceMedia            ServiceType = "Media"
+	ServicePTZ              ServiceType = "PTZ"
+	ServiceImaging          ServiceType = "Imaging"
+	ServiceEvent            ServiceType = "Event"
+	ServiceDeviceIO         ServiceType = "DeviceIO"
+	ServiceRecording        ServiceType = "Recording"
+	ServiceSearch           ServiceType = "Search"
+	ServiceReplay           ServiceType = "Replay"
+	ServiceReceiver         ServiceType = "Receiver"
+	ServiceAnalytics        ServiceType = "Analytics"
+	ServiceMedia2           ServiceType = "Media2"
+	ServiceAccessControl    ServiceType = "AccessControl"
+	ServiceDoorControl      ServiceType = "DoorControl"
+	ServiceCredential       ServiceType = "Credential"
+	ServiceSchedule         ServiceType = "Schedule"
+	ServiceAuthBehavior     ServiceType = "AuthBehavior"
+	ServiceAdvancedSecurity ServiceType = "AdvancedSecurity"
+	ServiceThermal          ServiceType = "Thermal"
+	ServiceDisplay          ServiceType = "Display"
+	ServiceProvisioning     ServiceType = "Provisioning"
+	ServiceUplink           ServiceType = "Uplink"
+	ServiceAppMgmt          ServiceType = "AppMgmt"
+	ServiceUnknown          ServiceType = "Unknown"
 )
 
 // CameraInfo stores camera identification information.
@@ -338,13 +355,29 @@ func ConvertV1ToV2(v1 *CapturedExchange) *CapturedExchangeV2 {
 var serviceNamespaces = map[string]ServiceType{
 	"http://www.onvif.org/ver10/device/wsdl":   ServiceDevice,
 	"http://www.onvif.org/ver10/media/wsdl":    ServiceMedia,
-	"http://www.onvif.org/ver20/media/wsdl":    ServiceMedia,
+	"http://www.onvif.org/ver20/media/wsdl":    ServiceMedia2,
 	"http://www.onvif.org/ver20/ptz/wsdl":      ServicePTZ,
 	"http://www.onvif.org/ver10/ptz/wsdl":      ServicePTZ,
 	"http://www.onvif.org/ver20/imaging/wsdl":  ServiceImaging,
 	"http://www.onvif.org/ver10/imaging/wsdl":  ServiceImaging,
 	"http://www.onvif.org/ver10/events/wsdl":   ServiceEvent,
-	"http://www.onvif.org/ver10/deviceIO/wsdl": ServiceDeviceIO,
+	"http://www.onvif.org/ver10/deviceIO/wsdl":                ServiceDeviceIO,
+	"http://www.onvif.org/ver10/recording/wsdl":              ServiceRecording,
+	"http://www.onvif.org/ver10/search/wsdl":                 ServiceSearch,
+	"http://www.onvif.org/ver10/replay/wsdl":                 ServiceReplay,
+	"http://www.onvif.org/ver10/receiver/wsdl":               ServiceReceiver,
+	"http://www.onvif.org/ver20/analytics/wsdl":              ServiceAnalytics,
+	"http://www.onvif.org/ver10/accesscontrol/wsdl":          ServiceAccessControl,
+	"http://www.onvif.org/ver10/doorcontrol/wsdl":            ServiceDoorControl,
+	"http://www.onvif.org/ver10/credential/wsdl":             ServiceCredential,
+	"http://www.onvif.org/ver10/schedule/wsdl":               ServiceSchedule,
+	"http://www.onvif.org/ver10/authenticationbehavior/wsdl": ServiceAuthBehavior,
+	"http://www.onvif.org/ver10/advancedsecurity/wsdl":       ServiceAdvancedSecurity,
+	"http://www.onvif.org/ver10/thermal/wsdl":                ServiceThermal,
+	"http://www.onvif.org/ver10/display/wsdl":                ServiceDisplay,
+	"http://www.onvif.org/ver10/provisioning/wsdl":           ServiceProvisioning,
+	"http://www.onvif.org/ver10/uplink/wsdl":                 ServiceUplink,
+	"http://www.onvif.org/ver10/appmgmt/wsdl":                ServiceAppMgmt,
 }
 
 // DetermineServiceType determines the service type from a SOAP request body.

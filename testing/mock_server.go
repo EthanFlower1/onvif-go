@@ -490,6 +490,19 @@ var tokenParams = []string{
 	"RuleToken",
 	"ScheduleToken",
 	"SpecialDayGroupToken",
+	"TrackToken",
+	"SearchToken",
+	"AccessPointToken",
+	"DoorToken",
+	"CredentialToken",
+	"AuthenticationProfileToken",
+	"SecurityLevelToken",
+	"KeyID",
+	"CertPathValidationPolicyID",
+	"PresetTourToken",
+	"AreaToken",
+	"ReceiverToken",
+	"AudioOutputToken",
 }
 
 // paramRegexes are compiled regexes for extracting parameters.
