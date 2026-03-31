@@ -1316,6 +1316,35 @@ type DurationRange struct {
 	Max string
 }
 
+// NetworkInterfaceSetConfiguration represents configuration to set on a network interface.
+type NetworkInterfaceSetConfiguration struct {
+	Enabled *bool
+	MTU     *int
+	IPv4    *IPv4NetworkInterfaceSetConfiguration
+}
+
+// IPv4NetworkInterfaceSetConfiguration represents IPv4 settings to apply to a network interface.
+type IPv4NetworkInterfaceSetConfiguration struct {
+	Enabled *bool
+	DHCP    *bool
+}
+
+// AuthFailureWarningOptions represents the allowable ranges for auth failure warning configuration.
+type AuthFailureWarningOptions struct {
+	MonitorPeriodRange IntRange
+	AuthFailureRange   IntRange
+}
+
+// PasswordComplexityOptions represents the options available for password complexity configuration.
+type PasswordComplexityOptions struct {
+	MinLenRange                      *IntRange
+	UppercaseRange                   *IntRange
+	NumberRange                      *IntRange
+	SpecialCharsRange                *IntRange
+	BlockUsernameOccurrenceSupported *bool
+	PolicyConfigurationLockSupported *bool
+}
+
 // PresetTour represents a PTZ preset tour.
 type PresetTour struct {
 	Token             string

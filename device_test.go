@@ -710,3 +710,99 @@ func BenchmarkDeviceGetDeviceInformation(b *testing.B) {
 		_, _ = client.GetDeviceInformation(ctx)
 	}
 }
+
+func TestSetNetworkInterfaces(t *testing.T) {
+	boolTrue := true
+	mtu := 1500
+
+	tests := []struct {
+		name         string
+		handler      http.HandlerFunc
+		wantErr      bool
+		wantReboot   bool
+	}{
+		{
+			name: "successful set with reboot needed",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tds:SetNetworkInterfacesResponse xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+							<tds:RebootNeeded>true</tds:RebootNeeded>
+						</tds:SetNetworkInterfacesResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:    false,
+			wantReboot: true,
+		},
+		{
+			name: "successful set without reboot",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tds:SetNetworkInterfacesResponse xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+							<tds:RebootNeeded>false</tds:RebootNeeded>
+						</tds:SetNetworkInterfacesResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:    false,
+			wantReboot: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Sender</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Invalid interface token</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			config := &NetworkInterfaceSetConfiguration{
+				Enabled: &boolTrue,
+				MTU:     &mtu,
+				IPv4: &IPv4NetworkInterfaceSetConfiguration{
+					Enabled: &boolTrue,
+					DHCP:    &boolTrue,
+				},
+			}
+
+			reboot, err := client.SetNetworkInterfaces(context.Background(), "eth0", config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SetNetworkInterfaces() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && reboot != tt.wantReboot {
+				t.Errorf("SetNetworkInterfaces() rebootNeeded = %v, want %v", reboot, tt.wantReboot)
+			}
+		})
+	}
+}

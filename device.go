@@ -1136,3 +1136,62 @@ func (c *Client) SetNetworkDefaultGateway(ctx context.Context, gateway *NetworkG
 
 	return nil
 }
+
+// SetNetworkInterfaces sets the network interface configuration on a device.
+// It returns whether a reboot is needed to apply the changes.
+func (c *Client) SetNetworkInterfaces(
+	ctx context.Context,
+	interfaceToken string,
+	config *NetworkInterfaceSetConfiguration,
+) (bool, error) {
+	type ipv4SetConfigXML struct {
+		Enabled *bool `xml:"tds:Enabled,omitempty"`
+		DHCP    *bool `xml:"tds:DHCP,omitempty"`
+	}
+
+	type networkInterfaceSetConfigXML struct {
+		Enabled *bool             `xml:"tds:Enabled,omitempty"`
+		MTU     *int              `xml:"tds:MTU,omitempty"`
+		IPv4    *ipv4SetConfigXML `xml:"tds:IPv4,omitempty"`
+	}
+
+	type setNetworkInterfacesRequest struct {
+		XMLName      xml.Name                     `xml:"tds:SetNetworkInterfaces"`
+		Xmlns        string                       `xml:"xmlns:tds,attr"`
+		IfaceToken   string                       `xml:"tds:InterfaceToken"`
+		NetworkIface networkInterfaceSetConfigXML `xml:"tds:NetworkInterface"`
+	}
+
+	type setNetworkInterfacesResponse struct {
+		XMLName      xml.Name `xml:"SetNetworkInterfacesResponse"`
+		RebootNeeded bool     `xml:"RebootNeeded"`
+	}
+
+	req := setNetworkInterfacesRequest{
+		Xmlns:      deviceNamespace,
+		IfaceToken: interfaceToken,
+	}
+
+	if config != nil {
+		req.NetworkIface.Enabled = config.Enabled
+		req.NetworkIface.MTU = config.MTU
+
+		if config.IPv4 != nil {
+			req.NetworkIface.IPv4 = &ipv4SetConfigXML{
+				Enabled: config.IPv4.Enabled,
+				DHCP:    config.IPv4.DHCP,
+			}
+		}
+	}
+
+	var resp setNetworkInterfacesResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, c.endpoint, "", req, &resp); err != nil {
+		return false, fmt.Errorf("SetNetworkInterfaces failed: %w", err)
+	}
+
+	return resp.RebootNeeded, nil
+}

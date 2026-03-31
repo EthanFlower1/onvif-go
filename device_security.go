@@ -526,3 +526,95 @@ func (c *Client) SetAuthFailureWarningConfiguration(
 
 	return nil
 }
+
+// GetAuthFailureWarningOptions retrieves the allowable ranges for auth failure warning configuration.
+func (c *Client) GetAuthFailureWarningOptions(ctx context.Context) (*AuthFailureWarningOptions, error) {
+	type getAuthFailureWarningOptionsRequest struct {
+		XMLName xml.Name `xml:"tds:GetAuthFailureWarningOptions"`
+		Xmlns   string   `xml:"xmlns:tds,attr"`
+	}
+
+	type intRangeXML struct {
+		Min int `xml:"Min"`
+		Max int `xml:"Max"`
+	}
+
+	type getAuthFailureWarningOptionsResponse struct {
+		XMLName            xml.Name    `xml:"GetAuthFailureWarningOptionsResponse"`
+		MonitorPeriodRange intRangeXML `xml:"MonitorPeriodRange"`
+		AuthFailureRange   intRangeXML `xml:"AuthFailureRange"`
+	}
+
+	req := getAuthFailureWarningOptionsRequest{
+		Xmlns: deviceNamespace,
+	}
+
+	var resp getAuthFailureWarningOptionsResponse
+	if err := c.newSOAPClient().Call(ctx, c.endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAuthFailureWarningOptions failed: %w", err)
+	}
+
+	return &AuthFailureWarningOptions{
+		MonitorPeriodRange: IntRange{Min: resp.MonitorPeriodRange.Min, Max: resp.MonitorPeriodRange.Max},
+		AuthFailureRange:   IntRange{Min: resp.AuthFailureRange.Min, Max: resp.AuthFailureRange.Max},
+	}, nil
+}
+
+// GetPasswordComplexityOptions retrieves the available options for password complexity configuration.
+func (c *Client) GetPasswordComplexityOptions(ctx context.Context) (*PasswordComplexityOptions, error) {
+	type getPasswordComplexityOptionsRequest struct {
+		XMLName xml.Name `xml:"tds:GetPasswordComplexityOptions"`
+		Xmlns   string   `xml:"xmlns:tds,attr"`
+	}
+
+	type intRangeXML struct {
+		Min int `xml:"Min"`
+		Max int `xml:"Max"`
+	}
+
+	type getPasswordComplexityOptionsResponse struct {
+		XMLName                          xml.Name     `xml:"GetPasswordComplexityOptionsResponse"`
+		MinLenRange                      *intRangeXML `xml:"MinLenRange"`
+		UppercaseRange                   *intRangeXML `xml:"UppercaseRange"`
+		NumberRange                      *intRangeXML `xml:"NumberRange"`
+		SpecialCharsRange                *intRangeXML `xml:"SpecialCharsRange"`
+		BlockUsernameOccurrenceSupported *bool        `xml:"BlockUsernameOccurrenceSupported"`
+		PolicyConfigurationLockSupported *bool        `xml:"PolicyConfigurationLockSupported"`
+	}
+
+	req := getPasswordComplexityOptionsRequest{
+		Xmlns: deviceNamespace,
+	}
+
+	var resp getPasswordComplexityOptionsResponse
+	if err := c.newSOAPClient().Call(ctx, c.endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetPasswordComplexityOptions failed: %w", err)
+	}
+
+	opts := &PasswordComplexityOptions{
+		BlockUsernameOccurrenceSupported: resp.BlockUsernameOccurrenceSupported,
+		PolicyConfigurationLockSupported: resp.PolicyConfigurationLockSupported,
+	}
+
+	if resp.MinLenRange != nil {
+		r := IntRange{Min: resp.MinLenRange.Min, Max: resp.MinLenRange.Max}
+		opts.MinLenRange = &r
+	}
+
+	if resp.UppercaseRange != nil {
+		r := IntRange{Min: resp.UppercaseRange.Min, Max: resp.UppercaseRange.Max}
+		opts.UppercaseRange = &r
+	}
+
+	if resp.NumberRange != nil {
+		r := IntRange{Min: resp.NumberRange.Min, Max: resp.NumberRange.Max}
+		opts.NumberRange = &r
+	}
+
+	if resp.SpecialCharsRange != nil {
+		r := IntRange{Min: resp.SpecialCharsRange.Min, Max: resp.SpecialCharsRange.Max}
+		opts.SpecialCharsRange = &r
+	}
+
+	return opts, nil
+}

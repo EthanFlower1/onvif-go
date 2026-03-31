@@ -155,6 +155,50 @@ func newMockDeviceSecurityServer() *httptest.Server {
 	</s:Body>
 </s:Envelope>`))
 
+		case strings.Contains(bodyContent, "GetAuthFailureWarningOptions"):
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tds:GetAuthFailureWarningOptionsResponse xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+			<tds:MonitorPeriodRange>
+				<tds:Min>1</tds:Min>
+				<tds:Max>100</tds:Max>
+			</tds:MonitorPeriodRange>
+			<tds:AuthFailureRange>
+				<tds:Min>1</tds:Min>
+				<tds:Max>50</tds:Max>
+			</tds:AuthFailureRange>
+		</tds:GetAuthFailureWarningOptionsResponse>
+	</s:Body>
+</s:Envelope>`))
+
+		case strings.Contains(bodyContent, "GetPasswordComplexityOptions"):
+			_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tds:GetPasswordComplexityOptionsResponse xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+			<tds:MinLenRange>
+				<tds:Min>4</tds:Min>
+				<tds:Max>64</tds:Max>
+			</tds:MinLenRange>
+			<tds:UppercaseRange>
+				<tds:Min>0</tds:Min>
+				<tds:Max>10</tds:Max>
+			</tds:UppercaseRange>
+			<tds:NumberRange>
+				<tds:Min>0</tds:Min>
+				<tds:Max>10</tds:Max>
+			</tds:NumberRange>
+			<tds:SpecialCharsRange>
+				<tds:Min>0</tds:Min>
+				<tds:Max>10</tds:Max>
+			</tds:SpecialCharsRange>
+			<tds:BlockUsernameOccurrenceSupported>true</tds:BlockUsernameOccurrenceSupported>
+			<tds:PolicyConfigurationLockSupported>false</tds:PolicyConfigurationLockSupported>
+		</tds:GetPasswordComplexityOptionsResponse>
+	</s:Body>
+</s:Envelope>`))
+
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -509,6 +553,188 @@ func TestSetAuthFailureWarningConfiguration(t *testing.T) {
 	err = client.SetAuthFailureWarningConfiguration(ctx, config)
 	if err != nil {
 		t.Fatalf("SetAuthFailureWarningConfiguration failed: %v", err)
+	}
+}
+
+func TestGetAuthFailureWarningOptions(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tds:GetAuthFailureWarningOptionsResponse xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+							<tds:MonitorPeriodRange>
+								<tds:Min>1</tds:Min>
+								<tds:Max>100</tds:Max>
+							</tds:MonitorPeriodRange>
+							<tds:AuthFailureRange>
+								<tds:Min>1</tds:Min>
+								<tds:Max>50</tds:Max>
+							</tds:AuthFailureRange>
+						</tds:GetAuthFailureWarningOptionsResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Not supported</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			opts, err := client.GetAuthFailureWarningOptions(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAuthFailureWarningOptions() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if opts == nil {
+					t.Fatal("Expected options, got nil")
+				}
+
+				if opts.MonitorPeriodRange.Min != 1 {
+					t.Errorf("MonitorPeriodRange.Min = %d, want 1", opts.MonitorPeriodRange.Min)
+				}
+
+				if opts.MonitorPeriodRange.Max != 100 {
+					t.Errorf("MonitorPeriodRange.Max = %d, want 100", opts.MonitorPeriodRange.Max)
+				}
+
+				if opts.AuthFailureRange.Min != 1 {
+					t.Errorf("AuthFailureRange.Min = %d, want 1", opts.AuthFailureRange.Min)
+				}
+
+				if opts.AuthFailureRange.Max != 50 {
+					t.Errorf("AuthFailureRange.Max = %d, want 50", opts.AuthFailureRange.Max)
+				}
+			}
+		})
+	}
+}
+
+func TestGetPasswordComplexityOptions(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tds:GetPasswordComplexityOptionsResponse xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+							<tds:MinLenRange><tds:Min>4</tds:Min><tds:Max>64</tds:Max></tds:MinLenRange>
+							<tds:UppercaseRange><tds:Min>0</tds:Min><tds:Max>10</tds:Max></tds:UppercaseRange>
+							<tds:NumberRange><tds:Min>0</tds:Min><tds:Max>10</tds:Max></tds:NumberRange>
+							<tds:SpecialCharsRange><tds:Min>0</tds:Min><tds:Max>10</tds:Max></tds:SpecialCharsRange>
+							<tds:BlockUsernameOccurrenceSupported>true</tds:BlockUsernameOccurrenceSupported>
+							<tds:PolicyConfigurationLockSupported>false</tds:PolicyConfigurationLockSupported>
+						</tds:GetPasswordComplexityOptionsResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Not supported</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			opts, err := client.GetPasswordComplexityOptions(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPasswordComplexityOptions() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if opts == nil {
+					t.Fatal("Expected options, got nil")
+				}
+
+				if opts.MinLenRange == nil {
+					t.Fatal("Expected MinLenRange, got nil")
+				}
+
+				if opts.MinLenRange.Min != 4 {
+					t.Errorf("MinLenRange.Min = %d, want 4", opts.MinLenRange.Min)
+				}
+
+				if opts.MinLenRange.Max != 64 {
+					t.Errorf("MinLenRange.Max = %d, want 64", opts.MinLenRange.Max)
+				}
+
+				if opts.BlockUsernameOccurrenceSupported == nil || !*opts.BlockUsernameOccurrenceSupported {
+					t.Error("BlockUsernameOccurrenceSupported should be true")
+				}
+
+				if opts.PolicyConfigurationLockSupported == nil || *opts.PolicyConfigurationLockSupported {
+					t.Error("PolicyConfigurationLockSupported should be false")
+				}
+			}
+		})
 	}
 }
 

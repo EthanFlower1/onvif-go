@@ -2,6 +2,7 @@ package onvif
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 
@@ -793,4 +794,35 @@ func (c *Client) StartSystemRestore(ctx context.Context) (uploadURI, expectedDow
 	}
 
 	return resp.UploadURI, resp.ExpectedDownTime, nil
+}
+
+// UpgradeSystemFirmware upgrades the device firmware by sending base64-encoded firmware data.
+// This is a simplified implementation; ONVIF specifies MTOM for the actual binary transfer.
+func (c *Client) UpgradeSystemFirmware(ctx context.Context, firmwareData []byte) (string, error) {
+	type upgradeSystemFirmwareRequest struct {
+		XMLName  xml.Name `xml:"tds:UpgradeSystemFirmware"`
+		Xmlns    string   `xml:"xmlns:tds,attr"`
+		Firmware string   `xml:"tds:Firmware"`
+	}
+
+	type upgradeSystemFirmwareResponse struct {
+		XMLName xml.Name `xml:"UpgradeSystemFirmwareResponse"`
+		Message string   `xml:"Message"`
+	}
+
+	req := upgradeSystemFirmwareRequest{
+		Xmlns:    deviceNamespace,
+		Firmware: base64.StdEncoding.EncodeToString(firmwareData),
+	}
+
+	var resp upgradeSystemFirmwareResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, c.endpoint, "", req, &resp); err != nil {
+		return "", fmt.Errorf("UpgradeSystemFirmware failed: %w", err)
+	}
+
+	return resp.Message, nil
 }

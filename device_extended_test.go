@@ -412,3 +412,72 @@ func TestFactoryDefaultTypeConstants(t *testing.T) {
 		t.Errorf("FactoryDefaultSoft should be 'Soft', got %s", FactoryDefaultSoft)
 	}
 }
+
+func TestUpgradeSystemFirmware(t *testing.T) {
+	tests := []struct {
+		name        string
+		handler     http.HandlerFunc
+		wantErr     bool
+		wantMessage string
+	}{
+		{
+			name: "successful firmware upgrade",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tds:UpgradeSystemFirmwareResponse xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+							<tds:Message>Upgrade started</tds:Message>
+						</tds:UpgradeSystemFirmwareResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:     false,
+			wantMessage: "Upgrade started",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Firmware upgrade not supported</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			firmwareData := []byte("fake firmware binary data")
+
+			msg, err := client.UpgradeSystemFirmware(context.Background(), firmwareData)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UpgradeSystemFirmware() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && msg != tt.wantMessage {
+				t.Errorf("UpgradeSystemFirmware() message = %q, want %q", msg, tt.wantMessage)
+			}
+		})
+	}
+}
