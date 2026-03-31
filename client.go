@@ -214,6 +214,28 @@ func (c *Client) fixLocalhostURL(serviceURL string) string {
 	return serviceURL
 }
 
+// serviceNamespaceMap maps ONVIF service namespace URIs to the corresponding
+// endpoint setter on the Client. Used by Initialize() to process GetServices() results.
+var serviceNamespaceMap = map[string]func(c *Client, xaddr string){
+	"http://www.onvif.org/ver10/recording/wsdl":              func(c *Client, x string) { c.recordingEndpoint = x },
+	"http://www.onvif.org/ver10/search/wsdl":                 func(c *Client, x string) { c.searchEndpoint = x },
+	"http://www.onvif.org/ver10/replay/wsdl":                 func(c *Client, x string) { c.replayEndpoint = x },
+	"http://www.onvif.org/ver10/receiver/wsdl":               func(c *Client, x string) { c.receiverEndpoint = x },
+	"http://www.onvif.org/ver20/analytics/wsdl":              func(c *Client, x string) { c.analyticsEndpoint = x },
+	"http://www.onvif.org/ver20/media/wsdl":                  func(c *Client, x string) { c.media2Endpoint = x },
+	"http://www.onvif.org/ver10/accesscontrol/wsdl":          func(c *Client, x string) { c.accessControlEndpoint = x },
+	"http://www.onvif.org/ver10/doorcontrol/wsdl":            func(c *Client, x string) { c.doorControlEndpoint = x },
+	"http://www.onvif.org/ver10/credential/wsdl":             func(c *Client, x string) { c.credentialEndpoint = x },
+	"http://www.onvif.org/ver10/schedule/wsdl":               func(c *Client, x string) { c.scheduleEndpoint = x },
+	"http://www.onvif.org/ver10/authenticationbehavior/wsdl": func(c *Client, x string) { c.authBehaviorEndpoint = x },
+	"http://www.onvif.org/ver10/advancedsecurity/wsdl":       func(c *Client, x string) { c.advancedSecurityEndpoint = x },
+	"http://www.onvif.org/ver10/thermal/wsdl":                func(c *Client, x string) { c.thermalEndpoint = x },
+	"http://www.onvif.org/ver10/display/wsdl":                func(c *Client, x string) { c.displayEndpoint = x },
+	"http://www.onvif.org/ver10/provisioning/wsdl":           func(c *Client, x string) { c.provisioningEndpoint = x },
+	"http://www.onvif.org/ver10/uplink/wsdl":                 func(c *Client, x string) { c.uplinkEndpoint = x },
+	"http://www.onvif.org/ver10/appmgmt/wsdl":                func(c *Client, x string) { c.appmgmtEndpoint = x },
+}
+
 // Initialize discovers and initializes service endpoints.
 func (c *Client) Initialize(ctx context.Context) error {
 	// Get device information and capabilities
@@ -235,6 +257,37 @@ func (c *Client) Initialize(ctx context.Context) error {
 	}
 	if capabilities.Events != nil && capabilities.Events.XAddr != "" {
 		c.eventEndpoint = c.fixLocalhostURL(capabilities.Events.XAddr)
+	}
+
+	// Cache extended capability endpoints from GetCapabilities response
+	if capabilities.Recording != nil && capabilities.Recording.XAddr != "" {
+		c.recordingEndpoint = c.fixLocalhostURL(capabilities.Recording.XAddr)
+	}
+	if capabilities.Search != nil && capabilities.Search.XAddr != "" {
+		c.searchEndpoint = c.fixLocalhostURL(capabilities.Search.XAddr)
+	}
+	if capabilities.Replay != nil && capabilities.Replay.XAddr != "" {
+		c.replayEndpoint = c.fixLocalhostURL(capabilities.Replay.XAddr)
+	}
+	if capabilities.Receiver != nil && capabilities.Receiver.XAddr != "" {
+		c.receiverEndpoint = c.fixLocalhostURL(capabilities.Receiver.XAddr)
+	}
+	if capabilities.Display != nil && capabilities.Display.XAddr != "" {
+		c.displayEndpoint = c.fixLocalhostURL(capabilities.Display.XAddr)
+	}
+	// DeviceIO endpoint is discovered via GetServices (namespace: http://www.onvif.org/ver10/deviceio/wsdl)
+
+	// Additionally call GetServices() for broader service discovery.
+	// GetServices() failure is non-fatal — some cameras don't support it.
+	if services, err := c.GetServices(ctx, false); err == nil {
+		for _, svc := range services {
+			if svc.XAddr == "" {
+				continue
+			}
+			if setter, ok := serviceNamespaceMap[svc.Namespace]; ok {
+				setter(c, c.fixLocalhostURL(svc.XAddr))
+			}
+		}
 	}
 
 	return nil

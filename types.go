@@ -19,6 +19,12 @@ type Capabilities struct {
 	Imaging   *ImagingCapabilities
 	Media     *MediaCapabilities
 	PTZ       *PTZCapabilities
+	Recording *RecordingCapabilities
+	Search    *SearchCapabilities
+	Replay    *ReplayCapabilities
+	Receiver  *ReceiverCapabilities
+	Display   *DisplayCapabilities
+	DeviceIO  *DeviceIOCapabilities
 	Extension *CapabilitiesExtension
 }
 
@@ -118,6 +124,24 @@ type SystemCapabilitiesExtension struct{}
 type IOCapabilitiesExtension struct{}
 type SecurityCapabilitiesExtension struct{}
 type StreamingCapabilitiesExtension struct{}
+
+// RecordingCapabilities represents recording service capabilities.
+type RecordingCapabilities struct{ XAddr string }
+
+// SearchCapabilities represents search service capabilities.
+type SearchCapabilities struct{ XAddr string }
+
+// ReplayCapabilities represents replay service capabilities.
+type ReplayCapabilities struct{ XAddr string }
+
+// ReceiverCapabilities represents receiver service capabilities.
+type ReceiverCapabilities struct{ XAddr string }
+
+// DisplayCapabilities represents display service capabilities.
+type DisplayCapabilities struct{ XAddr string }
+
+// DeviceIOCapabilities represents device I/O service capabilities.
+type DeviceIOCapabilities struct{ XAddr string }
 
 // Profile represents a media profile.
 type Profile struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -1411,5 +1412,111 @@ func TestDigestAuthTransportConcurrency(t *testing.T) {
 
 	if finalNC < numRequests {
 		t.Errorf("Expected nc >= %d, got %d", numRequests, finalNC)
+	}
+}
+
+func TestInitializeDualPathDiscovery(t *testing.T) {
+	const (
+		mediaXAddr     = "/onvif/media_service"
+		recordingXAddr = "/onvif/recording_service"
+		analyticsXAddr = "/onvif/analytics_service"
+	)
+
+	getCapabilitiesResponse := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tds:GetCapabilitiesResponse xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+			<tds:Capabilities>
+				<tds:Media>
+					<tds:XAddr>PLACEHOLDER_MEDIA</tds:XAddr>
+				</tds:Media>
+				<tds:Extension>
+					<tds:Recording>
+						<tds:XAddr>PLACEHOLDER_RECORDING</tds:XAddr>
+					</tds:Recording>
+				</tds:Extension>
+			</tds:Capabilities>
+		</tds:GetCapabilitiesResponse>
+	</s:Body>
+</s:Envelope>`
+
+	getServicesResponse := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tds:GetServicesResponse xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+			<tds:Service>
+				<tds:Namespace>http://www.onvif.org/ver20/analytics/wsdl</tds:Namespace>
+				<tds:XAddr>PLACEHOLDER_ANALYTICS</tds:XAddr>
+				<tds:Version>
+					<tt:Major>2</tt:Major>
+					<tt:Minor>0</tt:Minor>
+				</tds:Version>
+			</tds:Service>
+		</tds:GetServicesResponse>
+	</s:Body>
+</s:Envelope>`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusInternalServerError)
+
+			return
+		}
+
+		var response string
+		switch {
+		case strings.Contains(string(body), "GetCapabilities"):
+			response = getCapabilitiesResponse
+		case strings.Contains(string(body), "GetServices"):
+			response = getServicesResponse
+		default:
+			http.Error(w, "unknown operation", http.StatusBadRequest)
+
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/soap+xml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	// Replace placeholders with actual test server URLs
+	baseURL := server.URL
+	getCapabilitiesResponse = strings.ReplaceAll(getCapabilitiesResponse, "PLACEHOLDER_MEDIA", baseURL+mediaXAddr)
+	getCapabilitiesResponse = strings.ReplaceAll(getCapabilitiesResponse, "PLACEHOLDER_RECORDING", baseURL+recordingXAddr)
+	getServicesResponse = strings.ReplaceAll(getServicesResponse, "PLACEHOLDER_ANALYTICS", baseURL+analyticsXAddr)
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	if err := client.Initialize(context.Background()); err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+
+	// Endpoint from GetCapabilities (core path)
+	if client.mediaEndpoint != baseURL+mediaXAddr {
+		t.Errorf("mediaEndpoint = %q, want %q", client.mediaEndpoint, baseURL+mediaXAddr)
+	}
+
+	// Endpoint from GetCapabilities extension
+	if client.recordingEndpoint != baseURL+recordingXAddr {
+		t.Errorf("recordingEndpoint = %q, want %q", client.recordingEndpoint, baseURL+recordingXAddr)
+	}
+
+	// Endpoint from GetServices (secondary discovery path)
+	if client.analyticsEndpoint != baseURL+analyticsXAddr {
+		t.Errorf("analyticsEndpoint = %q, want %q", client.analyticsEndpoint, baseURL+analyticsXAddr)
+	}
+
+	// Verify HasRecordingService and HasAnalyticsService reflect discovered endpoints
+	if !client.HasRecordingService() {
+		t.Error("HasRecordingService() = false, want true")
+	}
+	if !client.HasAnalyticsService() {
+		t.Error("HasAnalyticsService() = false, want true")
 	}
 }

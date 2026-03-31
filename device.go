@@ -119,6 +119,26 @@ func (c *Client) GetCapabilities(ctx context.Context) (*Capabilities, error) {
 			PTZ *struct {
 				XAddr string `xml:"XAddr"`
 			} `xml:"PTZ"`
+			Extension *struct {
+				Recording *struct {
+					XAddr string `xml:"XAddr"`
+				} `xml:"Recording"`
+				Search *struct {
+					XAddr string `xml:"XAddr"`
+				} `xml:"Search"`
+				Replay *struct {
+					XAddr string `xml:"XAddr"`
+				} `xml:"Replay"`
+				Receiver *struct {
+					XAddr string `xml:"XAddr"`
+				} `xml:"Receiver"`
+				Display *struct {
+					XAddr string `xml:"XAddr"`
+				} `xml:"Display"`
+				DeviceIO *struct {
+					XAddr string `xml:"XAddr"`
+				} `xml:"DeviceIO"`
+			} `xml:"Extension"`
 		} `xml:"Capabilities"`
 	}
 
@@ -226,6 +246,28 @@ func (c *Client) GetCapabilities(ctx context.Context) (*Capabilities, error) {
 	if resp.Capabilities.PTZ != nil {
 		capabilities.PTZ = &PTZCapabilities{
 			XAddr: resp.Capabilities.PTZ.XAddr,
+		}
+	}
+
+	// Map extension capabilities
+	if ext := resp.Capabilities.Extension; ext != nil {
+		if ext.Recording != nil {
+			capabilities.Recording = &RecordingCapabilities{XAddr: ext.Recording.XAddr}
+		}
+		if ext.Search != nil {
+			capabilities.Search = &SearchCapabilities{XAddr: ext.Search.XAddr}
+		}
+		if ext.Replay != nil {
+			capabilities.Replay = &ReplayCapabilities{XAddr: ext.Replay.XAddr}
+		}
+		if ext.Receiver != nil {
+			capabilities.Receiver = &ReceiverCapabilities{XAddr: ext.Receiver.XAddr}
+		}
+		if ext.Display != nil {
+			capabilities.Display = &DisplayCapabilities{XAddr: ext.Display.XAddr}
+		}
+		if ext.DeviceIO != nil {
+			capabilities.DeviceIO = &DeviceIOCapabilities{XAddr: ext.DeviceIO.XAddr}
 		}
 	}
 
