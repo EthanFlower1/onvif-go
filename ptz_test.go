@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -1027,6 +1028,288 @@ func TestGetCompatiblePTZConfigurationsForProfile(t *testing.T) {
 				if len(configs) > 0 && configs[0].NodeToken != "NodeToken1" {
 					t.Errorf("Expected NodeToken NodeToken1, got %s", configs[0].NodeToken)
 				}
+			}
+		})
+	}
+}
+
+// TestPTZSendAuxiliaryCommand tests PTZSendAuxiliaryCommand operation.
+func TestPTZSendAuxiliaryCommand(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful send auxiliary command",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:SendAuxiliaryCommandResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+			<tptz:AuxiliaryResponse>OK</tptz:AuxiliaryResponse>
+		</tptz:SendAuxiliaryCommandResponse>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">Invalid auxiliary data</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			resp, err := client.PTZSendAuxiliaryCommand(context.Background(), "Profile1", "tt:Wiper|On")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PTZSendAuxiliaryCommand() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && resp != "OK" {
+				t.Errorf("Expected response 'OK', got %s", resp)
+			}
+		})
+	}
+}
+
+// TestPTZSendAuxiliaryCommandUsesTPTZNamespace verifies the request uses tptz: namespace.
+func TestPTZSendAuxiliaryCommandUsesTPTZNamespace(t *testing.T) {
+	var capturedBody []byte
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		buf := make([]byte, 4096)
+		n, _ := r.Body.Read(buf)
+		capturedBody = buf[:n]
+
+		response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:SendAuxiliaryCommandResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+			<tptz:AuxiliaryResponse>OK</tptz:AuxiliaryResponse>
+		</tptz:SendAuxiliaryCommandResponse>
+	</soap:Body>
+</soap:Envelope>`
+		w.Header().Set("Content-Type", "application/soap+xml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
+
+	client.ptzEndpoint = server.URL
+
+	_, err = client.PTZSendAuxiliaryCommand(context.Background(), "Profile1", "tt:Wiper|On")
+	if err != nil {
+		t.Fatalf("PTZSendAuxiliaryCommand() failed: %v", err)
+	}
+
+	bodyStr := string(capturedBody)
+	if !strings.Contains(bodyStr, "tptz:SendAuxiliaryCommand") {
+		t.Errorf("Expected request body to contain 'tptz:SendAuxiliaryCommand', got: %s", bodyStr)
+	}
+}
+
+// TestGeoMove tests GeoMove operation.
+func TestGeoMove(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful geo move",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:GeoMoveResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+		</tptz:GeoMoveResponse>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">GeoMove not supported</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			target := &GeoLocation{Lon: 13.404954, Lat: 52.520008}
+			err = client.GeoMove(context.Background(), "Profile1", target, nil, nil, nil)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GeoMove() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestGeoMoveRequestBody verifies the GeoMove request body contains tptz:GeoMove.
+func TestGeoMoveRequestBody(t *testing.T) {
+	var capturedBody []byte
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		buf := make([]byte, 4096)
+		n, _ := r.Body.Read(buf)
+		capturedBody = buf[:n]
+
+		response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:GeoMoveResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+		</tptz:GeoMoveResponse>
+	</soap:Body>
+</soap:Envelope>`
+		w.Header().Set("Content-Type", "application/soap+xml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient() failed: %v", err)
+	}
+
+	client.ptzEndpoint = server.URL
+
+	target := &GeoLocation{Lon: 13.404954, Lat: 52.520008}
+	err = client.GeoMove(context.Background(), "Profile1", target, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GeoMove() failed: %v", err)
+	}
+
+	bodyStr := string(capturedBody)
+	if !strings.Contains(bodyStr, "tptz:GeoMove") {
+		t.Errorf("Expected request body to contain 'tptz:GeoMove', got: %s", bodyStr)
+	}
+}
+
+// TestMoveAndStartTracking tests MoveAndStartTracking operation.
+func TestMoveAndStartTracking(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful move and start tracking",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:MoveAndStartTrackingResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+		</tptz:MoveAndStartTrackingResponse>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">Tracking not supported</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			presetToken := "Preset1"
+			req := &MoveAndStartTrackingRequest{
+				ProfileToken: "Profile1",
+				PresetToken:  &presetToken,
+			}
+
+			err = client.MoveAndStartTracking(context.Background(), req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("MoveAndStartTracking() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

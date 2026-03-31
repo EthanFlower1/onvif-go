@@ -1204,3 +1204,139 @@ func (c *Client) GetCompatiblePTZConfigurationsForProfile(ctx context.Context, p
 
 	return configs, nil
 }
+
+// PTZSendAuxiliaryCommand sends an auxiliary command to the PTZ node.
+func (c *Client) PTZSendAuxiliaryCommand(ctx context.Context, profileToken, auxiliaryData string) (string, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return "", ErrServiceNotSupported
+	}
+
+	type SendAuxiliaryCommand struct {
+		XMLName       xml.Name `xml:"tptz:SendAuxiliaryCommand"`
+		Xmlns         string   `xml:"xmlns:tptz,attr"`
+		ProfileToken  string   `xml:"tptz:ProfileToken"`
+		AuxiliaryData string   `xml:"tptz:AuxiliaryData"`
+	}
+
+	type SendAuxiliaryCommandResponse struct {
+		XMLName           xml.Name `xml:"SendAuxiliaryCommandResponse"`
+		AuxiliaryResponse string   `xml:"AuxiliaryResponse"`
+	}
+
+	req := SendAuxiliaryCommand{
+		Xmlns:         ptzNamespace,
+		ProfileToken:  profileToken,
+		AuxiliaryData: auxiliaryData,
+	}
+
+	var resp SendAuxiliaryCommandResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return "", fmt.Errorf("PTZSendAuxiliaryCommand failed: %w", err)
+	}
+
+	return resp.AuxiliaryResponse, nil
+}
+
+// geoLocationXML is a shared type for GeoLocation XML serialization.
+type geoLocationXML struct {
+	Lon       float64  `xml:"lon,attr"`
+	Lat       float64  `xml:"lat,attr"`
+	Elevation *float64 `xml:"elevation,attr,omitempty"`
+}
+
+// convertToGeoLocationXML converts GeoLocation to XML struct.
+func convertToGeoLocationXML(g *GeoLocation) *geoLocationXML {
+	if g == nil {
+		return nil
+	}
+
+	result := &geoLocationXML{
+		Lon: g.Lon,
+		Lat: g.Lat,
+	}
+	if g.Elevation != 0 {
+		elev := g.Elevation
+		result.Elevation = &elev
+	}
+
+	return result
+}
+
+// GeoMove moves the PTZ unit to a geographic location.
+func (c *Client) GeoMove(ctx context.Context, profileToken string, target *GeoLocation, speed *PTZSpeed, areaHeight, areaWidth *float64) error {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return ErrServiceNotSupported
+	}
+
+	type GeoMove struct {
+		XMLName      xml.Name        `xml:"tptz:GeoMove"`
+		Xmlns        string          `xml:"xmlns:tptz,attr"`
+		ProfileToken string          `xml:"tptz:ProfileToken"`
+		Target       *geoLocationXML `xml:"tptz:Target,omitempty"`
+		Speed        *ptzSpeedXML    `xml:"tptz:Speed,omitempty"`
+		AreaHeight   *float64        `xml:"tptz:AreaHeight,omitempty"`
+		AreaWidth    *float64        `xml:"tptz:AreaWidth,omitempty"`
+	}
+
+	req := GeoMove{
+		Xmlns:        ptzNamespace,
+		ProfileToken: profileToken,
+		Target:       convertToGeoLocationXML(target),
+		Speed:        convertToPTZSpeedXML(speed),
+		AreaHeight:   areaHeight,
+		AreaWidth:    areaWidth,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("GeoMove failed: %w", err)
+	}
+
+	return nil
+}
+
+// MoveAndStartTracking moves to a position and starts object tracking.
+func (c *Client) MoveAndStartTracking(ctx context.Context, request *MoveAndStartTrackingRequest) error {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return ErrServiceNotSupported
+	}
+
+	type MoveAndStartTracking struct {
+		XMLName        xml.Name        `xml:"tptz:MoveAndStartTracking"`
+		Xmlns          string          `xml:"xmlns:tptz,attr"`
+		ProfileToken   string          `xml:"tptz:ProfileToken"`
+		PresetToken    *string         `xml:"tptz:PresetToken,omitempty"`
+		GeoLocation    *geoLocationXML `xml:"tptz:GeoLocation,omitempty"`
+		TargetPosition *ptzVectorXML   `xml:"tptz:TargetPosition,omitempty"`
+		Speed          *ptzSpeedXML    `xml:"tptz:Speed,omitempty"`
+		ObjectID       *int            `xml:"tptz:ObjectID,omitempty"`
+	}
+
+	req := MoveAndStartTracking{
+		Xmlns:          ptzNamespace,
+		ProfileToken:   request.ProfileToken,
+		PresetToken:    request.PresetToken,
+		GeoLocation:    convertToGeoLocationXML(request.GeoLocation),
+		TargetPosition: convertToPTZVectorXML(request.TargetPosition),
+		Speed:          convertToPTZSpeedXML(request.Speed),
+		ObjectID:       request.ObjectID,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("MoveAndStartTracking failed: %w", err)
+	}
+
+	return nil
+}

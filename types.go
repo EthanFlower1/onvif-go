@@ -1344,3 +1344,13 @@ type PresetTourStartingConditionOptions struct {
 	RecurringTimeRange     *IntRange
 	RecurringDurationRange *DurationRange
 }
+
+// MoveAndStartTrackingRequest represents the request for MoveAndStartTracking operation.
+type MoveAndStartTrackingRequest struct {
+	ProfileToken   string
+	PresetToken    *string
+	GeoLocation    *GeoLocation
+	TargetPosition *PTZVector
+	Speed          *PTZSpeed
+	ObjectID       *int
+}
