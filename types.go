@@ -851,6 +851,19 @@ type ImagingStatus struct {
 	FocusStatus *FocusStatus
 }
 
+// ImagingServiceCapabilities represents the capabilities of the imaging service.
+type ImagingServiceCapabilities struct {
+	ImageStabilization bool
+	Presets            bool
+}
+
+// ImagingPreset represents an imaging preset.
+type ImagingPreset struct {
+	Token string
+	Name  string
+	Type  string
+}
+
 // FocusStatus represents focus status.
 type FocusStatus struct {
 	Position   float64

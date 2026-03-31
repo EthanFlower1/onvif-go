@@ -582,6 +582,173 @@ func (c *Client) StopFocus(ctx context.Context, videoSourceToken string) error {
 	return nil
 }
 
+// GetImagingServiceCapabilities retrieves the capabilities of the imaging service.
+func (c *Client) GetImagingServiceCapabilities(ctx context.Context) (*ImagingServiceCapabilities, error) {
+	endpoint := c.imagingEndpoint
+	if endpoint == "" {
+		endpoint = c.endpoint
+	}
+
+	type GetServiceCapabilities struct {
+		XMLName xml.Name `xml:"timg:GetServiceCapabilities"`
+		Xmlns   string   `xml:"xmlns:timg,attr"`
+	}
+
+	type GetServiceCapabilitiesResponse struct {
+		XMLName      xml.Name `xml:"GetServiceCapabilitiesResponse"`
+		Capabilities struct {
+			ImageStabilization bool `xml:"ImageStabilization,attr"`
+			Presets            bool `xml:"Presets,attr"`
+		} `xml:"Capabilities"`
+	}
+
+	req := GetServiceCapabilities{
+		Xmlns: imagingNamespace,
+	}
+
+	var resp GetServiceCapabilitiesResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetImagingServiceCapabilities failed: %w", err)
+	}
+
+	return &ImagingServiceCapabilities{
+		ImageStabilization: resp.Capabilities.ImageStabilization,
+		Presets:            resp.Capabilities.Presets,
+	}, nil
+}
+
+// GetImagingPresets retrieves available imaging presets for a video source.
+func (c *Client) GetImagingPresets(ctx context.Context, videoSourceToken string) ([]*ImagingPreset, error) {
+	endpoint := c.imagingEndpoint
+	if endpoint == "" {
+		endpoint = c.endpoint
+	}
+
+	type GetPresets struct {
+		XMLName          xml.Name `xml:"timg:GetPresets"`
+		Xmlns            string   `xml:"xmlns:timg,attr"`
+		VideoSourceToken string   `xml:"timg:VideoSourceToken"`
+	}
+
+	type PresetEntry struct {
+		Token string `xml:"token,attr"`
+		Type  string `xml:"type,attr"`
+		Name  string `xml:"Name"`
+	}
+
+	type GetPresetsResponse struct {
+		XMLName xml.Name      `xml:"GetPresetsResponse"`
+		Preset  []PresetEntry `xml:"Preset"`
+	}
+
+	req := GetPresets{
+		Xmlns:            imagingNamespace,
+		VideoSourceToken: videoSourceToken,
+	}
+
+	var resp GetPresetsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetImagingPresets failed: %w", err)
+	}
+
+	presets := make([]*ImagingPreset, 0, len(resp.Preset))
+	for i := range resp.Preset {
+		presets = append(presets, &ImagingPreset{
+			Token: resp.Preset[i].Token,
+			Name:  resp.Preset[i].Name,
+			Type:  resp.Preset[i].Type,
+		})
+	}
+
+	return presets, nil
+}
+
+// GetCurrentImagingPreset retrieves the current imaging preset for a video source.
+// Returns nil if no preset is currently set.
+func (c *Client) GetCurrentImagingPreset(ctx context.Context, videoSourceToken string) (*ImagingPreset, error) {
+	endpoint := c.imagingEndpoint
+	if endpoint == "" {
+		endpoint = c.endpoint
+	}
+
+	type GetCurrentPreset struct {
+		XMLName          xml.Name `xml:"timg:GetCurrentPreset"`
+		Xmlns            string   `xml:"xmlns:timg,attr"`
+		VideoSourceToken string   `xml:"timg:VideoSourceToken"`
+	}
+
+	type GetCurrentPresetResponse struct {
+		XMLName xml.Name `xml:"GetCurrentPresetResponse"`
+		Preset  *struct {
+			Token string `xml:"token,attr"`
+			Type  string `xml:"type,attr"`
+			Name  string `xml:"Name"`
+		} `xml:"Preset"`
+	}
+
+	req := GetCurrentPreset{
+		Xmlns:            imagingNamespace,
+		VideoSourceToken: videoSourceToken,
+	}
+
+	var resp GetCurrentPresetResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetCurrentImagingPreset failed: %w", err)
+	}
+
+	if resp.Preset == nil {
+		return nil, nil
+	}
+
+	return &ImagingPreset{
+		Token: resp.Preset.Token,
+		Name:  resp.Preset.Name,
+		Type:  resp.Preset.Type,
+	}, nil
+}
+
+// SetCurrentImagingPreset sets the current imaging preset for a video source.
+func (c *Client) SetCurrentImagingPreset(ctx context.Context, videoSourceToken, presetToken string) error {
+	endpoint := c.imagingEndpoint
+	if endpoint == "" {
+		endpoint = c.endpoint
+	}
+
+	type SetCurrentPreset struct {
+		XMLName          xml.Name `xml:"timg:SetCurrentPreset"`
+		Xmlns            string   `xml:"xmlns:timg,attr"`
+		VideoSourceToken string   `xml:"timg:VideoSourceToken"`
+		PresetToken      string   `xml:"timg:PresetToken"`
+	}
+
+	req := SetCurrentPreset{
+		Xmlns:            imagingNamespace,
+		VideoSourceToken: videoSourceToken,
+		PresetToken:      presetToken,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("SetCurrentImagingPreset failed: %w", err)
+	}
+
+	return nil
+}
+
 // GetImagingStatus retrieves imaging status.
 func (c *Client) GetImagingStatus(ctx context.Context, videoSourceToken string) (*ImagingStatus, error) {
 	endpoint := c.imagingEndpoint
