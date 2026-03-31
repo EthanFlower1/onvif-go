@@ -860,6 +860,663 @@ func (c *Client) SetVideoOutputConfiguration(ctx context.Context, config *VideoO
 	return nil
 }
 
+// GetDeviceIOAudioSources retrieves audio source reference tokens.
+func (c *Client) GetDeviceIOAudioSources(ctx context.Context) ([]string, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetAudioSources struct {
+		XMLName xml.Name `xml:"tmd:GetAudioSources"`
+		Xmlns   string   `xml:"xmlns:tmd,attr"`
+	}
+
+	type GetAudioSourcesResponse struct {
+		XMLName xml.Name `xml:"GetAudioSourcesResponse"`
+		Token   []string `xml:"Token"`
+	}
+
+	req := GetAudioSources{Xmlns: deviceIONamespace}
+
+	var resp GetAudioSourcesResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIOAudioSources failed: %w", err)
+	}
+
+	return resp.Token, nil
+}
+
+// GetDeviceIOAudioOutputs retrieves audio output reference tokens.
+func (c *Client) GetDeviceIOAudioOutputs(ctx context.Context) ([]string, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetAudioOutputs struct {
+		XMLName xml.Name `xml:"tmd:GetAudioOutputs"`
+		Xmlns   string   `xml:"xmlns:tmd,attr"`
+	}
+
+	type GetAudioOutputsResponse struct {
+		XMLName xml.Name `xml:"GetAudioOutputsResponse"`
+		Token   []string `xml:"Token"`
+	}
+
+	req := GetAudioOutputs{Xmlns: deviceIONamespace}
+
+	var resp GetAudioOutputsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIOAudioOutputs failed: %w", err)
+	}
+
+	return resp.Token, nil
+}
+
+// GetDeviceIOVideoSources retrieves video source reference tokens.
+func (c *Client) GetDeviceIOVideoSources(ctx context.Context) ([]string, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetVideoSources struct {
+		XMLName xml.Name `xml:"tmd:GetVideoSources"`
+		Xmlns   string   `xml:"xmlns:tmd,attr"`
+	}
+
+	type GetVideoSourcesResponse struct {
+		XMLName xml.Name `xml:"GetVideoSourcesResponse"`
+		Token   []string `xml:"Token"`
+	}
+
+	req := GetVideoSources{Xmlns: deviceIONamespace}
+
+	var resp GetVideoSourcesResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIOVideoSources failed: %w", err)
+	}
+
+	return resp.Token, nil
+}
+
+// GetDeviceIOAudioSourceConfiguration retrieves the audio source configuration for a given token.
+func (c *Client) GetDeviceIOAudioSourceConfiguration(ctx context.Context, audioSourceToken string) (*AudioSourceConfiguration, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetAudioSourceConfiguration struct {
+		XMLName          xml.Name `xml:"tmd:GetAudioSourceConfiguration"`
+		Xmlns            string   `xml:"xmlns:tmd,attr"`
+		AudioSourceToken string   `xml:"tmd:AudioSourceToken"`
+	}
+
+	type GetAudioSourceConfigurationResponse struct {
+		XMLName                  xml.Name `xml:"GetAudioSourceConfigurationResponse"`
+		AudioSourceConfiguration struct {
+			Token       string `xml:"token,attr"`
+			Name        string `xml:"Name"`
+			UseCount    int    `xml:"UseCount"`
+			SourceToken string `xml:"SourceToken"`
+		} `xml:"AudioSourceConfiguration"`
+	}
+
+	req := GetAudioSourceConfiguration{
+		Xmlns:            deviceIONamespace,
+		AudioSourceToken: audioSourceToken,
+	}
+
+	var resp GetAudioSourceConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIOAudioSourceConfiguration failed: %w", err)
+	}
+
+	return &AudioSourceConfiguration{
+		Token:       resp.AudioSourceConfiguration.Token,
+		Name:        resp.AudioSourceConfiguration.Name,
+		UseCount:    resp.AudioSourceConfiguration.UseCount,
+		SourceToken: resp.AudioSourceConfiguration.SourceToken,
+	}, nil
+}
+
+// GetDeviceIOAudioSourceConfigurationOptions retrieves audio source configuration options.
+func (c *Client) GetDeviceIOAudioSourceConfigurationOptions(ctx context.Context, audioSourceToken string) (interface{}, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetAudioSourceConfigurationOptions struct {
+		XMLName          xml.Name `xml:"tmd:GetAudioSourceConfigurationOptions"`
+		Xmlns            string   `xml:"xmlns:tmd,attr"`
+		AudioSourceToken string   `xml:"tmd:AudioSourceToken"`
+	}
+
+	type GetAudioSourceConfigurationOptionsResponse struct {
+		XMLName             xml.Name    `xml:"GetAudioSourceConfigurationOptionsResponse"`
+		AudioSourceOptions  interface{} `xml:"AudioSourceOptions"`
+	}
+
+	req := GetAudioSourceConfigurationOptions{
+		Xmlns:            deviceIONamespace,
+		AudioSourceToken: audioSourceToken,
+	}
+
+	var resp GetAudioSourceConfigurationOptionsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIOAudioSourceConfigurationOptions failed: %w", err)
+	}
+
+	return resp.AudioSourceOptions, nil
+}
+
+// SetDeviceIOAudioSourceConfiguration sets an audio source configuration.
+func (c *Client) SetDeviceIOAudioSourceConfiguration(ctx context.Context, config *AudioSourceConfiguration, forcePersistence bool) error {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type AudioSourceConfigurationXML struct {
+		Token       string `xml:"token,attr"`
+		Name        string `xml:"tt:Name"`
+		UseCount    int    `xml:"tt:UseCount"`
+		SourceToken string `xml:"tt:SourceToken"`
+	}
+
+	type SetAudioSourceConfiguration struct {
+		XMLName          xml.Name                    `xml:"tmd:SetAudioSourceConfiguration"`
+		Xmlns            string                      `xml:"xmlns:tmd,attr"`
+		XmlnsTT          string                      `xml:"xmlns:tt,attr"`
+		Configuration    AudioSourceConfigurationXML `xml:"tmd:Configuration"`
+		ForcePersistence bool                        `xml:"tmd:ForcePersistence"`
+	}
+
+	type SetAudioSourceConfigurationResponse struct {
+		XMLName xml.Name `xml:"SetAudioSourceConfigurationResponse"`
+	}
+
+	req := SetAudioSourceConfiguration{
+		Xmlns:   deviceIONamespace,
+		XmlnsTT: "http://www.onvif.org/ver10/schema",
+		Configuration: AudioSourceConfigurationXML{
+			Token:       config.Token,
+			Name:        config.Name,
+			UseCount:    config.UseCount,
+			SourceToken: config.SourceToken,
+		},
+		ForcePersistence: forcePersistence,
+	}
+
+	var resp SetAudioSourceConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return fmt.Errorf("SetDeviceIOAudioSourceConfiguration failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetDeviceIOAudioOutputConfiguration retrieves the audio output configuration for a given token.
+func (c *Client) GetDeviceIOAudioOutputConfiguration(ctx context.Context, audioOutputToken string) (*AudioOutputConfiguration, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetAudioOutputConfiguration struct {
+		XMLName          xml.Name `xml:"tmd:GetAudioOutputConfiguration"`
+		Xmlns            string   `xml:"xmlns:tmd,attr"`
+		AudioOutputToken string   `xml:"tmd:AudioOutputToken"`
+	}
+
+	type GetAudioOutputConfigurationResponse struct {
+		XMLName                  xml.Name `xml:"GetAudioOutputConfigurationResponse"`
+		AudioOutputConfiguration struct {
+			Token       string `xml:"token,attr"`
+			Name        string `xml:"Name"`
+			UseCount    int    `xml:"UseCount"`
+			OutputToken string `xml:"OutputToken"`
+		} `xml:"AudioOutputConfiguration"`
+	}
+
+	req := GetAudioOutputConfiguration{
+		Xmlns:            deviceIONamespace,
+		AudioOutputToken: audioOutputToken,
+	}
+
+	var resp GetAudioOutputConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIOAudioOutputConfiguration failed: %w", err)
+	}
+
+	return &AudioOutputConfiguration{
+		Token:       resp.AudioOutputConfiguration.Token,
+		Name:        resp.AudioOutputConfiguration.Name,
+		UseCount:    resp.AudioOutputConfiguration.UseCount,
+		OutputToken: resp.AudioOutputConfiguration.OutputToken,
+	}, nil
+}
+
+// GetDeviceIOAudioOutputConfigurationOptions retrieves audio output configuration options.
+func (c *Client) GetDeviceIOAudioOutputConfigurationOptions(ctx context.Context, audioOutputToken string) (interface{}, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetAudioOutputConfigurationOptions struct {
+		XMLName          xml.Name `xml:"tmd:GetAudioOutputConfigurationOptions"`
+		Xmlns            string   `xml:"xmlns:tmd,attr"`
+		AudioOutputToken string   `xml:"tmd:AudioOutputToken"`
+	}
+
+	type GetAudioOutputConfigurationOptionsResponse struct {
+		XMLName             xml.Name    `xml:"GetAudioOutputConfigurationOptionsResponse"`
+		AudioOutputOptions  interface{} `xml:"AudioOutputOptions"`
+	}
+
+	req := GetAudioOutputConfigurationOptions{
+		Xmlns:            deviceIONamespace,
+		AudioOutputToken: audioOutputToken,
+	}
+
+	var resp GetAudioOutputConfigurationOptionsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIOAudioOutputConfigurationOptions failed: %w", err)
+	}
+
+	return resp.AudioOutputOptions, nil
+}
+
+// SetDeviceIOAudioOutputConfiguration sets an audio output configuration.
+func (c *Client) SetDeviceIOAudioOutputConfiguration(ctx context.Context, config *AudioOutputConfiguration, forcePersistence bool) error {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type AudioOutputConfigurationXML struct {
+		Token       string `xml:"token,attr"`
+		Name        string `xml:"tt:Name"`
+		UseCount    int    `xml:"tt:UseCount"`
+		OutputToken string `xml:"tt:OutputToken"`
+	}
+
+	type SetAudioOutputConfiguration struct {
+		XMLName          xml.Name                    `xml:"tmd:SetAudioOutputConfiguration"`
+		Xmlns            string                      `xml:"xmlns:tmd,attr"`
+		XmlnsTT          string                      `xml:"xmlns:tt,attr"`
+		Configuration    AudioOutputConfigurationXML `xml:"tmd:Configuration"`
+		ForcePersistence bool                        `xml:"tmd:ForcePersistence"`
+	}
+
+	type SetAudioOutputConfigurationResponse struct {
+		XMLName xml.Name `xml:"SetAudioOutputConfigurationResponse"`
+	}
+
+	req := SetAudioOutputConfiguration{
+		Xmlns:   deviceIONamespace,
+		XmlnsTT: "http://www.onvif.org/ver10/schema",
+		Configuration: AudioOutputConfigurationXML{
+			Token:       config.Token,
+			Name:        config.Name,
+			UseCount:    config.UseCount,
+			OutputToken: config.OutputToken,
+		},
+		ForcePersistence: forcePersistence,
+	}
+
+	var resp SetAudioOutputConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return fmt.Errorf("SetDeviceIOAudioOutputConfiguration failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetDeviceIOVideoSourceConfiguration retrieves the video source configuration for a given token.
+func (c *Client) GetDeviceIOVideoSourceConfiguration(ctx context.Context, videoSourceToken string) (*VideoSourceConfiguration, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetVideoSourceConfiguration struct {
+		XMLName          xml.Name `xml:"tmd:GetVideoSourceConfiguration"`
+		Xmlns            string   `xml:"xmlns:tmd,attr"`
+		VideoSourceToken string   `xml:"tmd:VideoSourceToken"`
+	}
+
+	type GetVideoSourceConfigurationResponse struct {
+		XMLName                  xml.Name `xml:"GetVideoSourceConfigurationResponse"`
+		VideoSourceConfiguration struct {
+			Token       string `xml:"token,attr"`
+			Name        string `xml:"Name"`
+			UseCount    int    `xml:"UseCount"`
+			SourceToken string `xml:"SourceToken"`
+			Bounds      *struct {
+				X      int `xml:"x,attr"`
+				Y      int `xml:"y,attr"`
+				Width  int `xml:"width,attr"`
+				Height int `xml:"height,attr"`
+			} `xml:"Bounds"`
+		} `xml:"VideoSourceConfiguration"`
+	}
+
+	req := GetVideoSourceConfiguration{
+		Xmlns:            deviceIONamespace,
+		VideoSourceToken: videoSourceToken,
+	}
+
+	var resp GetVideoSourceConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIOVideoSourceConfiguration failed: %w", err)
+	}
+
+	cfg := &VideoSourceConfiguration{
+		Token:       resp.VideoSourceConfiguration.Token,
+		Name:        resp.VideoSourceConfiguration.Name,
+		UseCount:    resp.VideoSourceConfiguration.UseCount,
+		SourceToken: resp.VideoSourceConfiguration.SourceToken,
+	}
+
+	if resp.VideoSourceConfiguration.Bounds != nil {
+		cfg.Bounds = &IntRectangle{
+			X:      resp.VideoSourceConfiguration.Bounds.X,
+			Y:      resp.VideoSourceConfiguration.Bounds.Y,
+			Width:  resp.VideoSourceConfiguration.Bounds.Width,
+			Height: resp.VideoSourceConfiguration.Bounds.Height,
+		}
+	}
+
+	return cfg, nil
+}
+
+// GetDeviceIOVideoSourceConfigurationOptions retrieves video source configuration options.
+func (c *Client) GetDeviceIOVideoSourceConfigurationOptions(ctx context.Context, videoSourceToken string) (*VideoSourceConfigurationOptions, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetVideoSourceConfigurationOptions struct {
+		XMLName          xml.Name `xml:"tmd:GetVideoSourceConfigurationOptions"`
+		Xmlns            string   `xml:"xmlns:tmd,attr"`
+		VideoSourceToken string   `xml:"tmd:VideoSourceToken"`
+	}
+
+	type GetVideoSourceConfigurationOptionsResponse struct {
+		XMLName                         xml.Name `xml:"GetVideoSourceConfigurationOptionsResponse"`
+		VideoSourceConfigurationOptions struct {
+			BoundsRange *struct {
+				XRange *struct {
+					Min int `xml:"Min"`
+					Max int `xml:"Max"`
+				} `xml:"XRange"`
+				YRange *struct {
+					Min int `xml:"Min"`
+					Max int `xml:"Max"`
+				} `xml:"YRange"`
+				WidthRange *struct {
+					Min int `xml:"Min"`
+					Max int `xml:"Max"`
+				} `xml:"WidthRange"`
+				HeightRange *struct {
+					Min int `xml:"Min"`
+					Max int `xml:"Max"`
+				} `xml:"HeightRange"`
+			} `xml:"BoundsRange"`
+			VideoSourceTokensAvailable []string `xml:"VideoSourceTokensAvailable"`
+		} `xml:"VideoSourceConfigurationOptions"`
+	}
+
+	req := GetVideoSourceConfigurationOptions{
+		Xmlns:            deviceIONamespace,
+		VideoSourceToken: videoSourceToken,
+	}
+
+	var resp GetVideoSourceConfigurationOptionsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIOVideoSourceConfigurationOptions failed: %w", err)
+	}
+
+	options := &VideoSourceConfigurationOptions{
+		VideoSourceTokensAvailable: resp.VideoSourceConfigurationOptions.VideoSourceTokensAvailable,
+	}
+
+	if resp.VideoSourceConfigurationOptions.BoundsRange != nil {
+		br := resp.VideoSourceConfigurationOptions.BoundsRange
+		options.BoundsRange = &BoundsRange{}
+
+		if br.XRange != nil {
+			options.BoundsRange.X = &IntRange{Min: br.XRange.Min, Max: br.XRange.Max}
+		}
+
+		if br.YRange != nil {
+			options.BoundsRange.Y = &IntRange{Min: br.YRange.Min, Max: br.YRange.Max}
+		}
+
+		if br.WidthRange != nil {
+			options.BoundsRange.Width = &IntRange{Min: br.WidthRange.Min, Max: br.WidthRange.Max}
+		}
+
+		if br.HeightRange != nil {
+			options.BoundsRange.Height = &IntRange{Min: br.HeightRange.Min, Max: br.HeightRange.Max}
+		}
+	}
+
+	return options, nil
+}
+
+// SetDeviceIOVideoSourceConfiguration sets a video source configuration.
+func (c *Client) SetDeviceIOVideoSourceConfiguration(ctx context.Context, config *VideoSourceConfiguration, forcePersistence bool) error {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type BoundsXML struct {
+		X      int `xml:"x,attr"`
+		Y      int `xml:"y,attr"`
+		Width  int `xml:"width,attr"`
+		Height int `xml:"height,attr"`
+	}
+
+	type VideoSourceConfigurationXML struct {
+		Token       string     `xml:"token,attr"`
+		Name        string     `xml:"tt:Name"`
+		UseCount    int        `xml:"tt:UseCount"`
+		SourceToken string     `xml:"tt:SourceToken"`
+		Bounds      *BoundsXML `xml:"tt:Bounds,omitempty"`
+	}
+
+	type SetVideoSourceConfiguration struct {
+		XMLName          xml.Name                    `xml:"tmd:SetVideoSourceConfiguration"`
+		Xmlns            string                      `xml:"xmlns:tmd,attr"`
+		XmlnsTT          string                      `xml:"xmlns:tt,attr"`
+		Configuration    VideoSourceConfigurationXML `xml:"tmd:Configuration"`
+		ForcePersistence bool                        `xml:"tmd:ForcePersistence"`
+	}
+
+	type SetVideoSourceConfigurationResponse struct {
+		XMLName xml.Name `xml:"SetVideoSourceConfigurationResponse"`
+	}
+
+	cfgXML := VideoSourceConfigurationXML{
+		Token:       config.Token,
+		Name:        config.Name,
+		UseCount:    config.UseCount,
+		SourceToken: config.SourceToken,
+	}
+
+	if config.Bounds != nil {
+		cfgXML.Bounds = &BoundsXML{
+			X:      config.Bounds.X,
+			Y:      config.Bounds.Y,
+			Width:  config.Bounds.Width,
+			Height: config.Bounds.Height,
+		}
+	}
+
+	req := SetVideoSourceConfiguration{
+		Xmlns:            deviceIONamespace,
+		XmlnsTT:          "http://www.onvif.org/ver10/schema",
+		Configuration:    cfgXML,
+		ForcePersistence: forcePersistence,
+	}
+
+	var resp SetVideoSourceConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return fmt.Errorf("SetDeviceIOVideoSourceConfiguration failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetDeviceIORelayOutputs retrieves all relay outputs.
+func (c *Client) GetDeviceIORelayOutputs(ctx context.Context) ([]*RelayOutput, error) {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type GetRelayOutputs struct {
+		XMLName xml.Name `xml:"tmd:GetRelayOutputs"`
+		Xmlns   string   `xml:"xmlns:tmd,attr"`
+	}
+
+	type GetRelayOutputsResponse struct {
+		XMLName      xml.Name `xml:"GetRelayOutputsResponse"`
+		RelayOutputs []struct {
+			Token      string `xml:"token,attr"`
+			Properties struct {
+				Mode      string `xml:"Mode"`
+				DelayTime string `xml:"DelayTime"`
+				IdleState string `xml:"IdleState"`
+			} `xml:"Properties"`
+		} `xml:"RelayOutputs"`
+	}
+
+	req := GetRelayOutputs{Xmlns: deviceIONamespace}
+
+	var resp GetRelayOutputsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDeviceIORelayOutputs failed: %w", err)
+	}
+
+	outputs := make([]*RelayOutput, len(resp.RelayOutputs))
+	for i, ro := range resp.RelayOutputs {
+		outputs[i] = &RelayOutput{
+			Token: ro.Token,
+			Properties: RelayOutputSettings{
+				Mode:      RelayMode(ro.Properties.Mode),
+				IdleState: RelayIdleState(ro.Properties.IdleState),
+			},
+		}
+	}
+
+	return outputs, nil
+}
+
+// SetDeviceIORelayOutputState sets the logical state of a relay output.
+func (c *Client) SetDeviceIORelayOutputState(ctx context.Context, relayOutputToken string, logicalState string) error {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type SetRelayOutputState struct {
+		XMLName          xml.Name `xml:"tmd:SetRelayOutputState"`
+		Xmlns            string   `xml:"xmlns:tmd,attr"`
+		RelayOutputToken string   `xml:"tmd:RelayOutputToken"`
+		LogicalState     string   `xml:"tmd:LogicalState"`
+	}
+
+	type SetRelayOutputStateResponse struct {
+		XMLName xml.Name `xml:"SetRelayOutputStateResponse"`
+	}
+
+	req := SetRelayOutputState{
+		Xmlns:            deviceIONamespace,
+		RelayOutputToken: relayOutputToken,
+		LogicalState:     logicalState,
+	}
+
+	var resp SetRelayOutputStateResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return fmt.Errorf("SetDeviceIORelayOutputState failed: %w", err)
+	}
+
+	return nil
+}
+
+// SetDeviceIORelayOutputSettings sets the settings of a relay output.
+func (c *Client) SetDeviceIORelayOutputSettings(ctx context.Context, relayOutput *RelayOutput) error {
+	endpoint := c.getDeviceIOEndpoint()
+
+	type RelayOutputPropertiesXML struct {
+		Mode      string `xml:"tt:Mode"`
+		DelayTime string `xml:"tt:DelayTime,omitempty"`
+		IdleState string `xml:"tt:IdleState"`
+	}
+
+	type RelayOutputXML struct {
+		Token      string                   `xml:"token,attr"`
+		Properties RelayOutputPropertiesXML `xml:"tt:Properties"`
+	}
+
+	type SetRelayOutputSettings struct {
+		XMLName     xml.Name       `xml:"tmd:SetRelayOutputSettings"`
+		Xmlns       string         `xml:"xmlns:tmd,attr"`
+		XmlnsTT     string         `xml:"xmlns:tt,attr"`
+		RelayOutput RelayOutputXML `xml:"tmd:RelayOutput"`
+	}
+
+	type SetRelayOutputSettingsResponse struct {
+		XMLName xml.Name `xml:"SetRelayOutputSettingsResponse"`
+	}
+
+	req := SetRelayOutputSettings{
+		Xmlns:   deviceIONamespace,
+		XmlnsTT: "http://www.onvif.org/ver10/schema",
+		RelayOutput: RelayOutputXML{
+			Token: relayOutput.Token,
+			Properties: RelayOutputPropertiesXML{
+				Mode:      string(relayOutput.Properties.Mode),
+				IdleState: string(relayOutput.Properties.IdleState),
+			},
+		},
+	}
+
+	var resp SetRelayOutputSettingsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return fmt.Errorf("SetDeviceIORelayOutputSettings failed: %w", err)
+	}
+
+	return nil
+}
+
 // GetRelayOutputOptions retrieves relay output options.
 func (c *Client) GetRelayOutputOptions(ctx context.Context, relayOutputToken string) (*RelayOutputOptions, error) {
 	if relayOutputToken == "" {

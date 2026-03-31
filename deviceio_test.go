@@ -214,6 +214,186 @@ func newMockDeviceIOServer() *httptest.Server {
   </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>`
 
+		case strings.Contains(bodyStr, "GetAudioSources"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetAudioSourcesResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:Token>AudioSrc1</tmd:Token>
+      <tmd:Token>AudioSrc2</tmd:Token>
+    </tmd:GetAudioSourcesResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetAudioOutputs"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetAudioOutputsResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:Token>AudioOut1</tmd:Token>
+    </tmd:GetAudioOutputsResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetVideoSources"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetVideoSourcesResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:Token>VideoSrc1</tmd:Token>
+      <tmd:Token>VideoSrc2</tmd:Token>
+      <tmd:Token>VideoSrc3</tmd:Token>
+    </tmd:GetVideoSourcesResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetAudioSourceConfigurationOptions"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetAudioSourceConfigurationOptionsResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:AudioSourceOptions>
+        <tmd:InputTokensAvailable>AudioSrc1</tmd:InputTokensAvailable>
+      </tmd:AudioSourceOptions>
+    </tmd:GetAudioSourceConfigurationOptionsResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetAudioSourceConfiguration"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetAudioSourceConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:AudioSourceConfiguration token="cfg_audio_001">
+        <tmd:Name>Microphone</tmd:Name>
+        <tmd:UseCount>1</tmd:UseCount>
+        <tmd:SourceToken>AudioSrc1</tmd:SourceToken>
+      </tmd:AudioSourceConfiguration>
+    </tmd:GetAudioSourceConfigurationResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "SetAudioSourceConfiguration"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:SetAudioSourceConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetAudioOutputConfigurationOptions"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetAudioOutputConfigurationOptionsResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:AudioOutputOptions>
+        <tmd:OutputTokensAvailable>AudioOut1</tmd:OutputTokensAvailable>
+      </tmd:AudioOutputOptions>
+    </tmd:GetAudioOutputConfigurationOptionsResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetAudioOutputConfiguration"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetAudioOutputConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:AudioOutputConfiguration token="cfg_out_001">
+        <tmd:Name>Speaker</tmd:Name>
+        <tmd:UseCount>2</tmd:UseCount>
+        <tmd:OutputToken>AudioOut1</tmd:OutputToken>
+      </tmd:AudioOutputConfiguration>
+    </tmd:GetAudioOutputConfigurationResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "SetAudioOutputConfiguration"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:SetAudioOutputConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetVideoSourceConfigurationOptions"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetVideoSourceConfigurationOptionsResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:VideoSourceConfigurationOptions>
+        <tmd:BoundsRange>
+          <tmd:XRange><tmd:Min>0</tmd:Min><tmd:Max>1920</tmd:Max></tmd:XRange>
+          <tmd:YRange><tmd:Min>0</tmd:Min><tmd:Max>1080</tmd:Max></tmd:YRange>
+          <tmd:WidthRange><tmd:Min>320</tmd:Min><tmd:Max>1920</tmd:Max></tmd:WidthRange>
+          <tmd:HeightRange><tmd:Min>240</tmd:Min><tmd:Max>1080</tmd:Max></tmd:HeightRange>
+        </tmd:BoundsRange>
+        <tmd:VideoSourceTokensAvailable>VideoSrc1</tmd:VideoSourceTokensAvailable>
+      </tmd:VideoSourceConfigurationOptions>
+    </tmd:GetVideoSourceConfigurationOptionsResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetVideoSourceConfiguration"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetVideoSourceConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:VideoSourceConfiguration token="cfg_vid_001">
+        <tmd:Name>Main Camera</tmd:Name>
+        <tmd:UseCount>3</tmd:UseCount>
+        <tmd:SourceToken>VideoSrc1</tmd:SourceToken>
+        <tmd:Bounds x="0" y="0" width="1920" height="1080"/>
+      </tmd:VideoSourceConfiguration>
+    </tmd:GetVideoSourceConfigurationResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "SetVideoSourceConfiguration"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:SetVideoSourceConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetRelayOutputs"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetRelayOutputsResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:RelayOutputs token="relay_001">
+        <tmd:Properties>
+          <tmd:Mode>Monostable</tmd:Mode>
+          <tmd:DelayTime>PT5S</tmd:DelayTime>
+          <tmd:IdleState>open</tmd:IdleState>
+        </tmd:Properties>
+      </tmd:RelayOutputs>
+      <tmd:RelayOutputs token="relay_002">
+        <tmd:Properties>
+          <tmd:Mode>Bistable</tmd:Mode>
+          <tmd:IdleState>closed</tmd:IdleState>
+        </tmd:Properties>
+      </tmd:RelayOutputs>
+    </tmd:GetRelayOutputsResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "SetRelayOutputState"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:SetRelayOutputStateResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "SetRelayOutputSettings"):
+			response = testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:SetRelayOutputSettingsResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
 		default:
 			response = testDeviceIOXMLHeader + `
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
@@ -918,5 +1098,673 @@ func TestGetRelayOutputOptionsInvalidToken(t *testing.T) {
 	_, err = client.GetRelayOutputOptions(ctx, "")
 	if !errors.Is(err, ErrInvalidRelayOutputToken) {
 		t.Errorf("Expected ErrInvalidRelayOutputToken, got %v", err)
+	}
+}
+
+func TestGetDeviceIOAudioSources(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+		wantLen int
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetAudioSourcesResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:Token>AudioSrc1</tmd:Token>
+      <tmd:Token>AudioSrc2</tmd:Token>
+    </tmd:GetAudioSourcesResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: false,
+			wantLen: 2,
+		},
+		{
+			name: "SOAP fault",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <SOAP-ENV:Fault>
+      <SOAP-ENV:Code><SOAP-ENV:Value>SOAP-ENV:Receiver</SOAP-ENV:Value></SOAP-ENV:Code>
+      <SOAP-ENV:Reason><SOAP-ENV:Text>Internal error</SOAP-ENV:Text></SOAP-ENV:Reason>
+    </SOAP-ENV:Fault>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			tokens, err := client.GetDeviceIOAudioSources(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetDeviceIOAudioSources() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && len(tokens) != tt.wantLen {
+				t.Errorf("Expected %d tokens, got %d", tt.wantLen, len(tokens))
+			}
+		})
+	}
+}
+
+func TestGetDeviceIOAudioOutputs(t *testing.T) {
+	server := newMockDeviceIOServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	tokens, err := client.GetDeviceIOAudioOutputs(context.Background())
+	if err != nil {
+		t.Fatalf("GetDeviceIOAudioOutputs failed: %v", err)
+	}
+
+	if len(tokens) != 1 {
+		t.Fatalf("Expected 1 token, got %d", len(tokens))
+	}
+
+	if tokens[0] != "AudioOut1" {
+		t.Errorf("Expected token 'AudioOut1', got '%s'", tokens[0])
+	}
+}
+
+func TestGetDeviceIOVideoSources(t *testing.T) {
+	server := newMockDeviceIOServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	tokens, err := client.GetDeviceIOVideoSources(context.Background())
+	if err != nil {
+		t.Fatalf("GetDeviceIOVideoSources failed: %v", err)
+	}
+
+	if len(tokens) != 3 {
+		t.Fatalf("Expected 3 tokens, got %d", len(tokens))
+	}
+}
+
+func TestGetDeviceIOAudioSourceConfiguration(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetAudioSourceConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:AudioSourceConfiguration token="cfg_audio_001">
+        <tmd:Name>Microphone</tmd:Name>
+        <tmd:UseCount>1</tmd:UseCount>
+        <tmd:SourceToken>AudioSrc1</tmd:SourceToken>
+      </tmd:AudioSourceConfiguration>
+    </tmd:GetAudioSourceConfigurationResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <SOAP-ENV:Fault>
+      <SOAP-ENV:Code><SOAP-ENV:Value>SOAP-ENV:Receiver</SOAP-ENV:Value></SOAP-ENV:Code>
+      <SOAP-ENV:Reason><SOAP-ENV:Text>Not found</SOAP-ENV:Text></SOAP-ENV:Reason>
+    </SOAP-ENV:Fault>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			cfg, err := client.GetDeviceIOAudioSourceConfiguration(context.Background(), "AudioSrc1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetDeviceIOAudioSourceConfiguration() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if cfg == nil {
+					t.Fatal("Expected config, got nil")
+				}
+
+				if cfg.Token != "cfg_audio_001" {
+					t.Errorf("Expected token 'cfg_audio_001', got '%s'", cfg.Token)
+				}
+
+				if cfg.Name != "Microphone" {
+					t.Errorf("Expected name 'Microphone', got '%s'", cfg.Name)
+				}
+
+				if cfg.SourceToken != "AudioSrc1" {
+					t.Errorf("Expected source token 'AudioSrc1', got '%s'", cfg.SourceToken)
+				}
+			}
+		})
+	}
+}
+
+func TestSetDeviceIOAudioSourceConfiguration(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:SetAudioSourceConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <SOAP-ENV:Fault>
+      <SOAP-ENV:Code><SOAP-ENV:Value>SOAP-ENV:Receiver</SOAP-ENV:Value></SOAP-ENV:Code>
+      <SOAP-ENV:Reason><SOAP-ENV:Text>Permission denied</SOAP-ENV:Text></SOAP-ENV:Reason>
+    </SOAP-ENV:Fault>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			cfg := &AudioSourceConfiguration{
+				Token:       "cfg_audio_001",
+				Name:        "Microphone",
+				UseCount:    1,
+				SourceToken: "AudioSrc1",
+			}
+
+			err = client.SetDeviceIOAudioSourceConfiguration(context.Background(), cfg, true)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SetDeviceIOAudioSourceConfiguration() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetDeviceIOAudioOutputConfiguration(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetAudioOutputConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:AudioOutputConfiguration token="cfg_out_001">
+        <tmd:Name>Speaker</tmd:Name>
+        <tmd:UseCount>2</tmd:UseCount>
+        <tmd:OutputToken>AudioOut1</tmd:OutputToken>
+      </tmd:AudioOutputConfiguration>
+    </tmd:GetAudioOutputConfigurationResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <SOAP-ENV:Fault>
+      <SOAP-ENV:Code><SOAP-ENV:Value>SOAP-ENV:Receiver</SOAP-ENV:Value></SOAP-ENV:Code>
+      <SOAP-ENV:Reason><SOAP-ENV:Text>Not found</SOAP-ENV:Text></SOAP-ENV:Reason>
+    </SOAP-ENV:Fault>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			cfg, err := client.GetDeviceIOAudioOutputConfiguration(context.Background(), "AudioOut1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetDeviceIOAudioOutputConfiguration() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if cfg == nil {
+					t.Fatal("Expected config, got nil")
+				}
+
+				if cfg.Token != "cfg_out_001" {
+					t.Errorf("Expected token 'cfg_out_001', got '%s'", cfg.Token)
+				}
+
+				if cfg.Name != "Speaker" {
+					t.Errorf("Expected name 'Speaker', got '%s'", cfg.Name)
+				}
+
+				if cfg.OutputToken != "AudioOut1" {
+					t.Errorf("Expected output token 'AudioOut1', got '%s'", cfg.OutputToken)
+				}
+			}
+		})
+	}
+}
+
+func TestSetDeviceIOAudioOutputConfiguration(t *testing.T) {
+	server := newMockDeviceIOServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	cfg := &AudioOutputConfiguration{
+		Token:       "cfg_out_001",
+		Name:        "Speaker",
+		UseCount:    2,
+		OutputToken: "AudioOut1",
+	}
+
+	err = client.SetDeviceIOAudioOutputConfiguration(context.Background(), cfg, false)
+	if err != nil {
+		t.Fatalf("SetDeviceIOAudioOutputConfiguration failed: %v", err)
+	}
+}
+
+func TestGetDeviceIOVideoSourceConfiguration(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetVideoSourceConfigurationResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:VideoSourceConfiguration token="cfg_vid_001">
+        <tmd:Name>Main Camera</tmd:Name>
+        <tmd:UseCount>3</tmd:UseCount>
+        <tmd:SourceToken>VideoSrc1</tmd:SourceToken>
+        <tmd:Bounds x="0" y="0" width="1920" height="1080"/>
+      </tmd:VideoSourceConfiguration>
+    </tmd:GetVideoSourceConfigurationResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <SOAP-ENV:Fault>
+      <SOAP-ENV:Code><SOAP-ENV:Value>SOAP-ENV:Receiver</SOAP-ENV:Value></SOAP-ENV:Code>
+      <SOAP-ENV:Reason><SOAP-ENV:Text>Not found</SOAP-ENV:Text></SOAP-ENV:Reason>
+    </SOAP-ENV:Fault>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			cfg, err := client.GetDeviceIOVideoSourceConfiguration(context.Background(), "VideoSrc1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetDeviceIOVideoSourceConfiguration() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if cfg == nil {
+					t.Fatal("Expected config, got nil")
+				}
+
+				if cfg.Token != "cfg_vid_001" {
+					t.Errorf("Expected token 'cfg_vid_001', got '%s'", cfg.Token)
+				}
+
+				if cfg.SourceToken != "VideoSrc1" {
+					t.Errorf("Expected source token 'VideoSrc1', got '%s'", cfg.SourceToken)
+				}
+
+				if cfg.Bounds == nil {
+					t.Fatal("Expected Bounds to be set")
+				}
+
+				if cfg.Bounds.Width != 1920 || cfg.Bounds.Height != 1080 {
+					t.Errorf("Expected bounds 1920x1080, got %dx%d", cfg.Bounds.Width, cfg.Bounds.Height)
+				}
+			}
+		})
+	}
+}
+
+func TestSetDeviceIOVideoSourceConfiguration(t *testing.T) {
+	server := newMockDeviceIOServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	cfg := &VideoSourceConfiguration{
+		Token:       "cfg_vid_001",
+		Name:        "Main Camera",
+		UseCount:    3,
+		SourceToken: "VideoSrc1",
+		Bounds:      &IntRectangle{X: 0, Y: 0, Width: 1920, Height: 1080},
+	}
+
+	err = client.SetDeviceIOVideoSourceConfiguration(context.Background(), cfg, true)
+	if err != nil {
+		t.Fatalf("SetDeviceIOVideoSourceConfiguration failed: %v", err)
+	}
+}
+
+func TestGetDeviceIORelayOutputs(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+		wantLen int
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:GetRelayOutputsResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl">
+      <tmd:RelayOutputs token="relay_001">
+        <tmd:Properties>
+          <tmd:Mode>Monostable</tmd:Mode>
+          <tmd:DelayTime>PT5S</tmd:DelayTime>
+          <tmd:IdleState>open</tmd:IdleState>
+        </tmd:Properties>
+      </tmd:RelayOutputs>
+      <tmd:RelayOutputs token="relay_002">
+        <tmd:Properties>
+          <tmd:Mode>Bistable</tmd:Mode>
+          <tmd:IdleState>closed</tmd:IdleState>
+        </tmd:Properties>
+      </tmd:RelayOutputs>
+    </tmd:GetRelayOutputsResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: false,
+			wantLen: 2,
+		},
+		{
+			name: "SOAP fault",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <SOAP-ENV:Fault>
+      <SOAP-ENV:Code><SOAP-ENV:Value>SOAP-ENV:Receiver</SOAP-ENV:Value></SOAP-ENV:Code>
+      <SOAP-ENV:Reason><SOAP-ENV:Text>Service unavailable</SOAP-ENV:Text></SOAP-ENV:Reason>
+    </SOAP-ENV:Fault>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			outputs, err := client.GetDeviceIORelayOutputs(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetDeviceIORelayOutputs() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if len(outputs) != tt.wantLen {
+					t.Fatalf("Expected %d relay outputs, got %d", tt.wantLen, len(outputs))
+				}
+
+				if outputs[0].Token != "relay_001" {
+					t.Errorf("Expected token 'relay_001', got '%s'", outputs[0].Token)
+				}
+
+				if outputs[0].Properties.Mode != RelayModeMonostable {
+					t.Errorf("Expected mode Monostable, got '%s'", outputs[0].Properties.Mode)
+				}
+
+				if outputs[0].Properties.IdleState != RelayIdleStateOpen {
+					t.Errorf("Expected idle state open, got '%s'", outputs[0].Properties.IdleState)
+				}
+
+				if outputs[1].Properties.Mode != RelayModeBistable {
+					t.Errorf("Expected mode Bistable, got '%s'", outputs[1].Properties.Mode)
+				}
+			}
+		})
+	}
+}
+
+func TestSetDeviceIORelayOutputState(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:SetRelayOutputStateResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <SOAP-ENV:Fault>
+      <SOAP-ENV:Code><SOAP-ENV:Value>SOAP-ENV:Receiver</SOAP-ENV:Value></SOAP-ENV:Code>
+      <SOAP-ENV:Reason><SOAP-ENV:Text>Invalid token</SOAP-ENV:Text></SOAP-ENV:Reason>
+    </SOAP-ENV:Fault>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			err = client.SetDeviceIORelayOutputState(context.Background(), "relay_001", string(RelayLogicalStateActive))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SetDeviceIORelayOutputState() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestSetDeviceIORelayOutputSettings(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "success",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <tmd:SetRelayOutputSettingsResponse xmlns:tmd="http://www.onvif.org/ver10/deviceIO/wsdl"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(testDeviceIOXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <SOAP-ENV:Fault>
+      <SOAP-ENV:Code><SOAP-ENV:Value>SOAP-ENV:Receiver</SOAP-ENV:Value></SOAP-ENV:Code>
+      <SOAP-ENV:Reason><SOAP-ENV:Text>Invalid token</SOAP-ENV:Text></SOAP-ENV:Reason>
+    </SOAP-ENV:Fault>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			ro := &RelayOutput{
+				Token: "relay_001",
+				Properties: RelayOutputSettings{
+					Mode:      RelayModeMonostable,
+					IdleState: RelayIdleStateOpen,
+				},
+			}
+
+			err = client.SetDeviceIORelayOutputSettings(context.Background(), ro)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SetDeviceIORelayOutputSettings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
