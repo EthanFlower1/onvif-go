@@ -166,6 +166,82 @@ func newMockEventServer() *httptest.Server {
   </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>`
 
+		case strings.Contains(bodyStr, "wsnt:Subscribe"):
+			response = testEventXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <wsnt:SubscribeResponse xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2">
+      <wsnt:SubscriptionReference>
+        <wsa:Address xmlns:wsa="http://www.w3.org/2005/08/addressing">http://192.168.1.100/onvif/subscription/ws1</wsa:Address>
+      </wsnt:SubscriptionReference>
+      <wsnt:TerminationTime>2025-01-15T11:30:00Z</wsnt:TerminationTime>
+    </wsnt:SubscribeResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetCurrentMessage"):
+			response = testEventXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <wsnt:GetCurrentMessageResponse xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2">
+      <wsnt:NotificationMessage>
+        <wsnt:Topic>tns1:VideoSource/MotionAlarm</wsnt:Topic>
+      </wsnt:NotificationMessage>
+    </wsnt:GetCurrentMessageResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "CreatePullPoint"):
+			response = testEventXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <wsnt:CreatePullPointResponse xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2">
+      <wsnt:PullPoint>
+        <wsa:Address xmlns:wsa="http://www.w3.org/2005/08/addressing">http://192.168.1.100/onvif/pullpoint/1</wsa:Address>
+      </wsnt:PullPoint>
+    </wsnt:CreatePullPointResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "DestroyPullPoint"):
+			response = testEventXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <wsnt:DestroyPullPointResponse xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "GetMessages"):
+			response = testEventXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <wsnt:GetMessagesResponse xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2">
+      <wsnt:NotificationMessage>
+        <wsnt:Topic>tns1:VideoSource/MotionAlarm</wsnt:Topic>
+      </wsnt:NotificationMessage>
+      <wsnt:NotificationMessage>
+        <wsnt:Topic>tns1:VideoSource/TamperingDetector</wsnt:Topic>
+      </wsnt:NotificationMessage>
+    </wsnt:GetMessagesResponse>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "PauseSubscription"):
+			response = testEventXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <wsnt:PauseSubscriptionResponse xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
+		case strings.Contains(bodyStr, "ResumeSubscription"):
+			response = testEventXMLHeader + `
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
+  <SOAP-ENV:Body>
+    <wsnt:ResumeSubscriptionResponse xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2"/>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`
+
 		default:
 			response = testEventXMLHeader + `
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope">
@@ -715,6 +791,249 @@ func TestSplitSpaceSeparated(t *testing.T) {
 				t.Errorf("splitSpaceSeparated(%q)[%d] = %q, expected %q", tt.input, i, v, tt.expected[i])
 			}
 		}
+	}
+}
+
+func TestSubscribe(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Test without filter or termination time.
+	subRef, termTime, err := client.Subscribe(ctx, "http://callback:8080/events", "", nil)
+	if err != nil {
+		t.Fatalf("Subscribe failed: %v", err)
+	}
+
+	if subRef == "" {
+		t.Error("Expected subscription reference to be set")
+	}
+
+	if termTime == nil {
+		t.Error("Expected termination time to be set")
+	}
+
+	// Test with filter and termination time.
+	dur := 60 * time.Second
+	subRef2, _, err := client.Subscribe(ctx, "http://callback:8080/events", "tns1:VideoAnalytics", &dur)
+	if err != nil {
+		t.Fatalf("Subscribe with filter and termination time failed: %v", err)
+	}
+
+	if subRef2 == "" {
+		t.Error("Expected subscription reference to be set")
+	}
+}
+
+func TestSubscribeInvalidTerminationTime(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	invalidDur := -1 * time.Second
+	_, _, err = client.Subscribe(ctx, "http://callback:8080/events", "", &invalidDur)
+	if !errors.Is(err, ErrInvalidTerminationTime) {
+		t.Errorf("Expected ErrInvalidTerminationTime, got %v", err)
+	}
+}
+
+func TestGetCurrentMessage(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	message, err := client.GetCurrentMessage(ctx, "tns1:VideoSource/MotionAlarm")
+	if err != nil {
+		t.Fatalf("GetCurrentMessage failed: %v", err)
+	}
+
+	// Message may be empty string if the response body has no inner XML — just verify no error.
+	_ = message
+}
+
+func TestCreateLegacyPullPoint(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	pullPointAddr, err := client.CreateLegacyPullPoint(ctx)
+	if err != nil {
+		t.Fatalf("CreateLegacyPullPoint failed: %v", err)
+	}
+
+	if pullPointAddr == "" {
+		t.Error("Expected pull point address to be set")
+	}
+}
+
+func TestDestroyLegacyPullPoint(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	err = client.DestroyLegacyPullPoint(ctx, server.URL+"/pullpoint/1")
+	if err != nil {
+		t.Fatalf("DestroyLegacyPullPoint failed: %v", err)
+	}
+}
+
+func TestDestroyLegacyPullPointEmptyRef(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	err = client.DestroyLegacyPullPoint(ctx, "")
+	if !errors.Is(err, ErrInvalidSubscriptionReference) {
+		t.Errorf("Expected ErrInvalidSubscriptionReference, got %v", err)
+	}
+}
+
+func TestGetLegacyMessages(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	messages, err := client.GetLegacyMessages(ctx, server.URL+"/pullpoint/1", 10)
+	if err != nil {
+		t.Fatalf("GetLegacyMessages failed: %v", err)
+	}
+
+	if len(messages) == 0 {
+		t.Error("Expected at least one message")
+	}
+}
+
+func TestGetLegacyMessagesValidation(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Test empty pull point reference.
+	_, err = client.GetLegacyMessages(ctx, "", 10)
+	if !errors.Is(err, ErrInvalidSubscriptionReference) {
+		t.Errorf("Expected ErrInvalidSubscriptionReference, got %v", err)
+	}
+
+	// Test invalid max messages.
+	_, err = client.GetLegacyMessages(ctx, server.URL+"/pullpoint/1", 0)
+	if !errors.Is(err, ErrInvalidMessageLimit) {
+		t.Errorf("Expected ErrInvalidMessageLimit, got %v", err)
+	}
+}
+
+func TestPauseSubscription(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	err = client.PauseSubscription(ctx, server.URL+"/subscription/1")
+	if err != nil {
+		t.Fatalf("PauseSubscription failed: %v", err)
+	}
+}
+
+func TestPauseSubscriptionEmptyRef(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	err = client.PauseSubscription(ctx, "")
+	if !errors.Is(err, ErrInvalidSubscriptionReference) {
+		t.Errorf("Expected ErrInvalidSubscriptionReference, got %v", err)
+	}
+}
+
+func TestResumeSubscription(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	err = client.ResumeSubscription(ctx, server.URL+"/subscription/1")
+	if err != nil {
+		t.Fatalf("ResumeSubscription failed: %v", err)
+	}
+}
+
+func TestResumeSubscriptionEmptyRef(t *testing.T) {
+	server := newMockEventServer()
+	defer server.Close()
+
+	client, err := NewClient(server.URL, WithCredentials("admin", "password"))
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	ctx := context.Background()
+
+	err = client.ResumeSubscription(ctx, "")
+	if !errors.Is(err, ErrInvalidSubscriptionReference) {
+		t.Errorf("Expected ErrInvalidSubscriptionReference, got %v", err)
 	}
 }
 

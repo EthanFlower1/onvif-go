@@ -729,6 +729,326 @@ func (c *Client) GetEventBrokers(ctx context.Context) ([]*EventBrokerConfig, err
 	return brokers, nil
 }
 
+// wsBaseNotificationNamespace is the WS-BaseNotification namespace.
+const wsBaseNotificationNamespace = "http://docs.oasis-open.org/wsn/b-2"
+
+// wsAddressingNamespace is the WS-Addressing namespace.
+const wsAddressingNamespace = "http://www.w3.org/2005/08/addressing"
+
+// Subscribe creates a WS-BaseNotification subscription on the event service.
+// It returns the subscription reference address and the termination time.
+func (c *Client) Subscribe(
+	ctx context.Context,
+	consumerReference string,
+	filter string,
+	terminationTime *time.Duration,
+) (string, *time.Time, error) {
+	endpoint := c.getEventEndpoint()
+
+	type ConsumerReference struct {
+		Address string `xml:"wsa:Address"`
+		XmlnsWsa string `xml:"xmlns:wsa,attr"`
+	}
+
+	type TopicExpression struct {
+		Dialect string `xml:"Dialect,attr"`
+		Value   string `xml:",chardata"`
+	}
+
+	type FilterXML struct {
+		TopicExpression *TopicExpression `xml:"wsnt:TopicExpression,omitempty"`
+	}
+
+	type Subscribe struct {
+		XMLName           xml.Name          `xml:"wsnt:Subscribe"`
+		XmlnsWsnt         string            `xml:"xmlns:wsnt,attr"`
+		ConsumerReference ConsumerReference `xml:"wsnt:ConsumerReference"`
+		Filter            *FilterXML        `xml:"wsnt:Filter,omitempty"`
+		InitialTerminationTime string        `xml:"wsnt:InitialTerminationTime,omitempty"`
+	}
+
+	type SubscribeResponse struct {
+		XMLName               xml.Name `xml:"SubscribeResponse"`
+		SubscriptionReference struct {
+			Address string `xml:"Address"`
+		} `xml:"SubscriptionReference"`
+		TerminationTime string `xml:"TerminationTime"`
+	}
+
+	req := Subscribe{
+		XmlnsWsnt: wsBaseNotificationNamespace,
+		ConsumerReference: ConsumerReference{
+			Address:  consumerReference,
+			XmlnsWsa: wsAddressingNamespace,
+		},
+	}
+
+	if filter != "" {
+		req.Filter = &FilterXML{
+			TopicExpression: &TopicExpression{
+				Dialect: "http://www.onvif.org/ver10/tev/topicExpression/ConcreteSet",
+				Value:   filter,
+			},
+		}
+	}
+
+	if terminationTime != nil {
+		if *terminationTime <= 0 {
+			return "", nil, ErrInvalidTerminationTime
+		}
+
+		req.InitialTerminationTime = formatDuration(*terminationTime)
+	}
+
+	var resp SubscribeResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	soapAction := "http://docs.oasis-open.org/wsn/bw-2/NotificationProducer/SubscribeRequest"
+
+	if err := soapClient.Call(ctx, endpoint, soapAction, req, &resp); err != nil {
+		return "", nil, fmt.Errorf("Subscribe failed: %w", err)
+	}
+
+	subRef := resp.SubscriptionReference.Address
+
+	var termTime *time.Time
+
+	if resp.TerminationTime != "" {
+		if t, err := time.Parse(time.RFC3339, resp.TerminationTime); err == nil {
+			termTime = &t
+		}
+	}
+
+	return subRef, termTime, nil
+}
+
+// GetCurrentMessage retrieves the current message for a topic from the event service.
+func (c *Client) GetCurrentMessage(ctx context.Context, topic string) (string, error) {
+	endpoint := c.getEventEndpoint()
+
+	type TopicExpression struct {
+		Dialect string `xml:"Dialect,attr"`
+		Value   string `xml:",chardata"`
+	}
+
+	type GetCurrentMessage struct {
+		XMLName xml.Name        `xml:"wsnt:GetCurrentMessage"`
+		Xmlns   string          `xml:"xmlns:wsnt,attr"`
+		Topic   TopicExpression `xml:"wsnt:Topic"`
+	}
+
+	type GetCurrentMessageResponse struct {
+		XMLName xml.Name `xml:"GetCurrentMessageResponse"`
+		Message []byte   `xml:",innerxml"`
+	}
+
+	req := GetCurrentMessage{
+		Xmlns: wsBaseNotificationNamespace,
+		Topic: TopicExpression{
+			Dialect: "http://www.onvif.org/ver10/tev/topicExpression/ConcreteSet",
+			Value:   topic,
+		},
+	}
+
+	var resp GetCurrentMessageResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	soapAction := "http://docs.oasis-open.org/wsn/bw-2/NotificationProducer/GetCurrentMessageRequest"
+
+	if err := soapClient.Call(ctx, endpoint, soapAction, req, &resp); err != nil {
+		return "", fmt.Errorf("GetCurrentMessage failed: %w", err)
+	}
+
+	return string(resp.Message), nil
+}
+
+// CreateLegacyPullPoint creates a WS-BaseNotification pull point on the event service.
+// It returns the pull point address.
+func (c *Client) CreateLegacyPullPoint(ctx context.Context) (string, error) {
+	endpoint := c.getEventEndpoint()
+
+	type CreatePullPoint struct {
+		XMLName xml.Name `xml:"wsnt:CreatePullPoint"`
+		Xmlns   string   `xml:"xmlns:wsnt,attr"`
+	}
+
+	type CreatePullPointResponse struct {
+		XMLName   xml.Name `xml:"CreatePullPointResponse"`
+		PullPoint struct {
+			Address string `xml:"Address"`
+		} `xml:"PullPoint"`
+	}
+
+	req := CreatePullPoint{
+		Xmlns: wsBaseNotificationNamespace,
+	}
+
+	var resp CreatePullPointResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	soapAction := "http://docs.oasis-open.org/wsn/bw-2/CreatePullPoint/CreatePullPointRequest"
+
+	if err := soapClient.Call(ctx, endpoint, soapAction, req, &resp); err != nil {
+		return "", fmt.Errorf("CreateLegacyPullPoint failed: %w", err)
+	}
+
+	return resp.PullPoint.Address, nil
+}
+
+// DestroyLegacyPullPoint destroys a WS-BaseNotification pull point.
+// The request is sent to the pull point reference endpoint.
+func (c *Client) DestroyLegacyPullPoint(ctx context.Context, pullPointRef string) error {
+	if pullPointRef == "" {
+		return ErrInvalidSubscriptionReference
+	}
+
+	type DestroyPullPoint struct {
+		XMLName xml.Name `xml:"wsnt:DestroyPullPoint"`
+		Xmlns   string   `xml:"xmlns:wsnt,attr"`
+	}
+
+	type DestroyPullPointResponse struct {
+		XMLName xml.Name `xml:"DestroyPullPointResponse"`
+	}
+
+	req := DestroyPullPoint{
+		Xmlns: wsBaseNotificationNamespace,
+	}
+
+	var resp DestroyPullPointResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	soapAction := "http://docs.oasis-open.org/wsn/bw-2/PullPoint/DestroyPullPointRequest"
+
+	if err := soapClient.Call(ctx, pullPointRef, soapAction, req, &resp); err != nil {
+		return fmt.Errorf("DestroyLegacyPullPoint failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetLegacyMessages retrieves notification messages from a WS-BaseNotification pull point.
+// The request is sent to the pull point reference endpoint.
+func (c *Client) GetLegacyMessages(ctx context.Context, pullPointRef string, maxMessages int) ([]string, error) {
+	if pullPointRef == "" {
+		return nil, ErrInvalidSubscriptionReference
+	}
+
+	if maxMessages <= 0 {
+		return nil, ErrInvalidMessageLimit
+	}
+
+	type GetMessages struct {
+		XMLName       xml.Name `xml:"wsnt:GetMessages"`
+		Xmlns         string   `xml:"xmlns:wsnt,attr"`
+		MaximumNumber int      `xml:"wsnt:MaximumNumber"`
+	}
+
+	type GetMessagesResponse struct {
+		XMLName              xml.Name `xml:"GetMessagesResponse"`
+		NotificationMessages [][]byte `xml:"NotificationMessage"`
+	}
+
+	req := GetMessages{
+		Xmlns:         wsBaseNotificationNamespace,
+		MaximumNumber: maxMessages,
+	}
+
+	var resp GetMessagesResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	soapAction := "http://docs.oasis-open.org/wsn/bw-2/PullPoint/GetMessagesRequest"
+
+	if err := soapClient.Call(ctx, pullPointRef, soapAction, req, &resp); err != nil {
+		return nil, fmt.Errorf("GetLegacyMessages failed: %w", err)
+	}
+
+	messages := make([]string, len(resp.NotificationMessages))
+	for i, m := range resp.NotificationMessages {
+		messages[i] = string(m)
+	}
+
+	return messages, nil
+}
+
+// PauseSubscription pauses a WS-BaseNotification subscription.
+// The request is sent to the subscription reference endpoint.
+func (c *Client) PauseSubscription(ctx context.Context, subscriptionRef string) error {
+	if subscriptionRef == "" {
+		return ErrInvalidSubscriptionReference
+	}
+
+	type PauseSubscription struct {
+		XMLName xml.Name `xml:"wsnt:PauseSubscription"`
+		Xmlns   string   `xml:"xmlns:wsnt,attr"`
+	}
+
+	type PauseSubscriptionResponse struct {
+		XMLName xml.Name `xml:"PauseSubscriptionResponse"`
+	}
+
+	req := PauseSubscription{
+		Xmlns: wsBaseNotificationNamespace,
+	}
+
+	var resp PauseSubscriptionResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	soapAction := "http://docs.oasis-open.org/wsn/bw-2/PausableSubscriptionManager/PauseSubscriptionRequest"
+
+	if err := soapClient.Call(ctx, subscriptionRef, soapAction, req, &resp); err != nil {
+		return fmt.Errorf("PauseSubscription failed: %w", err)
+	}
+
+	return nil
+}
+
+// ResumeSubscription resumes a paused WS-BaseNotification subscription.
+// The request is sent to the subscription reference endpoint.
+func (c *Client) ResumeSubscription(ctx context.Context, subscriptionRef string) error {
+	if subscriptionRef == "" {
+		return ErrInvalidSubscriptionReference
+	}
+
+	type ResumeSubscription struct {
+		XMLName xml.Name `xml:"wsnt:ResumeSubscription"`
+		Xmlns   string   `xml:"xmlns:wsnt,attr"`
+	}
+
+	type ResumeSubscriptionResponse struct {
+		XMLName xml.Name `xml:"ResumeSubscriptionResponse"`
+	}
+
+	req := ResumeSubscription{
+		Xmlns: wsBaseNotificationNamespace,
+	}
+
+	var resp ResumeSubscriptionResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	soapAction := "http://docs.oasis-open.org/wsn/bw-2/PausableSubscriptionManager/ResumeSubscriptionRequest"
+
+	if err := soapClient.Call(ctx, subscriptionRef, soapAction, req, &resp); err != nil {
+		return fmt.Errorf("ResumeSubscription failed: %w", err)
+	}
+
+	return nil
+}
+
 // formatDuration formats a duration as an ISO 8601 duration string.
 func formatDuration(d time.Duration) string {
 	seconds := int(d.Seconds())
