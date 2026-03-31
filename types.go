@@ -218,6 +218,29 @@ type PTZConfiguration struct {
 	ZoomLimits                             *ZoomLimits
 }
 
+// PTZNode represents a PTZ node on the device.
+type PTZNode struct {
+	Token                  string
+	Name                   string
+	HomeSupported          bool
+	MaximumNumberOfPresets int
+	AuxiliaryCommands      []string
+}
+
+// PTZConfigurationOptions represents available PTZ configuration options.
+type PTZConfigurationOptions struct {
+	PTZTimeout *struct {
+		Min string
+		Max string
+	}
+}
+
+// PTZServiceCapabilities represents PTZ service capabilities.
+type PTZServiceCapabilities struct {
+	EFlip   bool
+	Reverse bool
+}
+
 // MetadataConfiguration represents metadata configuration.
 type MetadataConfiguration struct {
 	Token          string

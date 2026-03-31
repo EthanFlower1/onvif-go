@@ -614,3 +614,280 @@ func (c *Client) GetConfigurations(ctx context.Context) ([]*PTZConfiguration, er
 
 	return configs, nil
 }
+
+// GetNodes retrieves all PTZ nodes on the device.
+func (c *Client) GetNodes(ctx context.Context) ([]*PTZNode, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return nil, ErrServiceNotSupported
+	}
+
+	type GetNodes struct {
+		XMLName xml.Name `xml:"tptz:GetNodes"`
+		Xmlns   string   `xml:"xmlns:tptz,attr"`
+	}
+
+	type GetNodesResponse struct {
+		XMLName xml.Name `xml:"GetNodesResponse"`
+		PTZNode []struct {
+			Token                  string   `xml:"token,attr"`
+			Name                   string   `xml:"Name"`
+			HomeSupported          bool     `xml:"HomeSupported"`
+			MaximumNumberOfPresets int      `xml:"MaximumNumberOfPresets"`
+			AuxiliaryCommands      []string `xml:"AuxiliaryCommands"`
+		} `xml:"PTZNode"`
+	}
+
+	req := GetNodes{
+		Xmlns: ptzNamespace,
+	}
+
+	var resp GetNodesResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetNodes failed: %w", err)
+	}
+
+	nodes := make([]*PTZNode, len(resp.PTZNode))
+	for i, n := range resp.PTZNode {
+		nodes[i] = &PTZNode{
+			Token:                  n.Token,
+			Name:                   n.Name,
+			HomeSupported:          n.HomeSupported,
+			MaximumNumberOfPresets: n.MaximumNumberOfPresets,
+			AuxiliaryCommands:      n.AuxiliaryCommands,
+		}
+	}
+
+	return nodes, nil
+}
+
+// GetNode retrieves a specific PTZ node by token.
+func (c *Client) GetNode(ctx context.Context, nodeToken string) (*PTZNode, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return nil, ErrServiceNotSupported
+	}
+
+	type GetNode struct {
+		XMLName   xml.Name `xml:"tptz:GetNode"`
+		Xmlns     string   `xml:"xmlns:tptz,attr"`
+		NodeToken string   `xml:"tptz:NodeToken"`
+	}
+
+	type GetNodeResponse struct {
+		XMLName xml.Name `xml:"GetNodeResponse"`
+		PTZNode struct {
+			Token                  string   `xml:"token,attr"`
+			Name                   string   `xml:"Name"`
+			HomeSupported          bool     `xml:"HomeSupported"`
+			MaximumNumberOfPresets int      `xml:"MaximumNumberOfPresets"`
+			AuxiliaryCommands      []string `xml:"AuxiliaryCommands"`
+		} `xml:"PTZNode"`
+	}
+
+	req := GetNode{
+		Xmlns:     ptzNamespace,
+		NodeToken: nodeToken,
+	}
+
+	var resp GetNodeResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetNode failed: %w", err)
+	}
+
+	return &PTZNode{
+		Token:                  resp.PTZNode.Token,
+		Name:                   resp.PTZNode.Name,
+		HomeSupported:          resp.PTZNode.HomeSupported,
+		MaximumNumberOfPresets: resp.PTZNode.MaximumNumberOfPresets,
+		AuxiliaryCommands:      resp.PTZNode.AuxiliaryCommands,
+	}, nil
+}
+
+// GetPTZConfigurationOptions retrieves PTZ configuration options for a given configuration token.
+func (c *Client) GetPTZConfigurationOptions(ctx context.Context, configurationToken string) (*PTZConfigurationOptions, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return nil, ErrServiceNotSupported
+	}
+
+	type GetPTZConfigurationOptions struct {
+		XMLName            xml.Name `xml:"tptz:GetConfigurationOptions"`
+		Xmlns              string   `xml:"xmlns:tptz,attr"`
+		ConfigurationToken string   `xml:"tptz:ConfigurationToken"`
+	}
+
+	type GetPTZConfigurationOptionsResponse struct {
+		XMLName              xml.Name `xml:"GetConfigurationOptionsResponse"`
+		PTZConfigurationOptions struct {
+			PTZTimeout *struct {
+				Min string `xml:"Min"`
+				Max string `xml:"Max"`
+			} `xml:"PTZTimeout"`
+		} `xml:"PTZConfigurationOptions"`
+	}
+
+	req := GetPTZConfigurationOptions{
+		Xmlns:              ptzNamespace,
+		ConfigurationToken: configurationToken,
+	}
+
+	var resp GetPTZConfigurationOptionsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetPTZConfigurationOptions failed: %w", err)
+	}
+
+	opts := &PTZConfigurationOptions{}
+	if resp.PTZConfigurationOptions.PTZTimeout != nil {
+		opts.PTZTimeout = &struct {
+			Min string
+			Max string
+		}{
+			Min: resp.PTZConfigurationOptions.PTZTimeout.Min,
+			Max: resp.PTZConfigurationOptions.PTZTimeout.Max,
+		}
+	}
+
+	return opts, nil
+}
+
+// SetPTZConfiguration sets a PTZ configuration on the device.
+func (c *Client) SetPTZConfiguration(ctx context.Context, config *PTZConfiguration, forcePersistence bool) error {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return ErrServiceNotSupported
+	}
+
+	type setPTZConfigurationXML struct {
+		Token     string `xml:"token,attr"`
+		Name      string `xml:"tt:Name"`
+		NodeToken string `xml:"tt:NodeToken"`
+	}
+
+	type SetPTZConfiguration struct {
+		XMLName          xml.Name               `xml:"tptz:SetConfiguration"`
+		Xmlns            string                 `xml:"xmlns:tptz,attr"`
+		XmlnsTT          string                 `xml:"xmlns:tt,attr"`
+		PTZConfiguration setPTZConfigurationXML `xml:"tptz:PTZConfiguration"`
+		ForcePersistence bool                   `xml:"tptz:ForcePersistence"`
+	}
+
+	req := SetPTZConfiguration{
+		Xmlns:   ptzNamespace,
+		XmlnsTT: "http://www.onvif.org/ver10/schema",
+		PTZConfiguration: setPTZConfigurationXML{
+			Token:     config.Token,
+			Name:      config.Name,
+			NodeToken: config.NodeToken,
+		},
+		ForcePersistence: forcePersistence,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("SetPTZConfiguration failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetPTZServiceCapabilities retrieves the capabilities of the PTZ service.
+func (c *Client) GetPTZServiceCapabilities(ctx context.Context) (*PTZServiceCapabilities, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return nil, ErrServiceNotSupported
+	}
+
+	type GetServiceCapabilities struct {
+		XMLName xml.Name `xml:"tptz:GetServiceCapabilities"`
+		Xmlns   string   `xml:"xmlns:tptz,attr"`
+	}
+
+	type GetServiceCapabilitiesResponse struct {
+		XMLName      xml.Name `xml:"GetServiceCapabilitiesResponse"`
+		Capabilities struct {
+			EFlip   bool `xml:"EFlip,attr"`
+			Reverse bool `xml:"Reverse,attr"`
+		} `xml:"Capabilities"`
+	}
+
+	req := GetServiceCapabilities{
+		Xmlns: ptzNamespace,
+	}
+
+	var resp GetServiceCapabilitiesResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetPTZServiceCapabilities failed: %w", err)
+	}
+
+	return &PTZServiceCapabilities{
+		EFlip:   resp.Capabilities.EFlip,
+		Reverse: resp.Capabilities.Reverse,
+	}, nil
+}
+
+// GetCompatiblePTZConfigurationsForProfile retrieves PTZ configurations compatible with a given profile.
+func (c *Client) GetCompatiblePTZConfigurationsForProfile(ctx context.Context, profileToken string) ([]*PTZConfiguration, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return nil, ErrServiceNotSupported
+	}
+
+	type GetCompatibleConfigurations struct {
+		XMLName      xml.Name `xml:"tptz:GetCompatibleConfigurations"`
+		Xmlns        string   `xml:"xmlns:tptz,attr"`
+		ProfileToken string   `xml:"tptz:ProfileToken"`
+	}
+
+	type GetCompatibleConfigurationsResponse struct {
+		XMLName          xml.Name `xml:"GetCompatibleConfigurationsResponse"`
+		PTZConfiguration []struct {
+			Token     string `xml:"token,attr"`
+			Name      string `xml:"Name"`
+			NodeToken string `xml:"NodeToken"`
+		} `xml:"PTZConfiguration"`
+	}
+
+	req := GetCompatibleConfigurations{
+		Xmlns:        ptzNamespace,
+		ProfileToken: profileToken,
+	}
+
+	var resp GetCompatibleConfigurationsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetCompatiblePTZConfigurationsForProfile failed: %w", err)
+	}
+
+	configs := make([]*PTZConfiguration, len(resp.PTZConfiguration))
+	for i, cfg := range resp.PTZConfiguration {
+		configs[i] = &PTZConfiguration{
+			Token:     cfg.Token,
+			Name:      cfg.Name,
+			NodeToken: cfg.NodeToken,
+		}
+	}
+
+	return configs, nil
+}
