@@ -844,6 +844,319 @@ func (c *Client) GetPTZServiceCapabilities(ctx context.Context) (*PTZServiceCapa
 	}, nil
 }
 
+// GetPresetTours retrieves all preset tours for a profile.
+func (c *Client) GetPresetTours(ctx context.Context, profileToken string) ([]*PresetTour, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return nil, ErrServiceNotSupported
+	}
+
+	type GetPresetTours struct {
+		XMLName      xml.Name `xml:"tptz:GetPresetTours"`
+		Xmlns        string   `xml:"xmlns:tptz,attr"`
+		ProfileToken string   `xml:"tptz:ProfileToken"`
+	}
+
+	type GetPresetToursResponse struct {
+		XMLName    xml.Name `xml:"GetPresetToursResponse"`
+		PresetTour []struct {
+			Token     string `xml:"token,attr"`
+			Name      string `xml:"Name"`
+			Status    struct {
+				State string `xml:"State"`
+			} `xml:"Status"`
+			AutoStart bool `xml:"AutoStart"`
+		} `xml:"PresetTour"`
+	}
+
+	req := GetPresetTours{
+		Xmlns:        ptzNamespace,
+		ProfileToken: profileToken,
+	}
+
+	var resp GetPresetToursResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetPresetTours failed: %w", err)
+	}
+
+	tours := make([]*PresetTour, len(resp.PresetTour))
+	for i, t := range resp.PresetTour {
+		tours[i] = &PresetTour{
+			Token:     t.Token,
+			Name:      t.Name,
+			Status:    t.Status.State,
+			AutoStart: t.AutoStart,
+		}
+	}
+
+	return tours, nil
+}
+
+// GetPresetTour retrieves a specific preset tour by token.
+func (c *Client) GetPresetTour(ctx context.Context, profileToken, presetTourToken string) (*PresetTour, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return nil, ErrServiceNotSupported
+	}
+
+	type GetPresetTour struct {
+		XMLName         xml.Name `xml:"tptz:GetPresetTour"`
+		Xmlns           string   `xml:"xmlns:tptz,attr"`
+		ProfileToken    string   `xml:"tptz:ProfileToken"`
+		PresetTourToken string   `xml:"tptz:PresetTourToken"`
+	}
+
+	type GetPresetTourResponse struct {
+		XMLName    xml.Name `xml:"GetPresetTourResponse"`
+		PresetTour struct {
+			Token     string `xml:"token,attr"`
+			Name      string `xml:"Name"`
+			Status    struct {
+				State string `xml:"State"`
+			} `xml:"Status"`
+			AutoStart bool `xml:"AutoStart"`
+		} `xml:"PresetTour"`
+	}
+
+	req := GetPresetTour{
+		Xmlns:           ptzNamespace,
+		ProfileToken:    profileToken,
+		PresetTourToken: presetTourToken,
+	}
+
+	var resp GetPresetTourResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetPresetTour failed: %w", err)
+	}
+
+	return &PresetTour{
+		Token:     resp.PresetTour.Token,
+		Name:      resp.PresetTour.Name,
+		Status:    resp.PresetTour.Status.State,
+		AutoStart: resp.PresetTour.AutoStart,
+	}, nil
+}
+
+// GetPresetTourOptions retrieves available options for a preset tour.
+func (c *Client) GetPresetTourOptions(ctx context.Context, profileToken string, presetTourToken string) (*PTZPresetTourOptions, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return nil, ErrServiceNotSupported
+	}
+
+	type GetPresetTourOptions struct {
+		XMLName         xml.Name `xml:"tptz:GetPresetTourOptions"`
+		Xmlns           string   `xml:"xmlns:tptz,attr"`
+		ProfileToken    string   `xml:"tptz:ProfileToken"`
+		PresetTourToken *string  `xml:"tptz:PresetTourToken,omitempty"`
+	}
+
+	type GetPresetTourOptionsResponse struct {
+		XMLName xml.Name `xml:"GetPresetTourOptionsResponse"`
+		Options struct {
+			AutoStart         bool `xml:"AutoStart"`
+			StartingCondition *struct {
+				RecurringTimeRange *struct {
+					Min int `xml:"Min"`
+					Max int `xml:"Max"`
+				} `xml:"RecurringTimeRange"`
+				RecurringDurationRange *struct {
+					Min string `xml:"Min"`
+					Max string `xml:"Max"`
+				} `xml:"RecurringDurationRange"`
+			} `xml:"StartingCondition"`
+		} `xml:"Options"`
+	}
+
+	req := GetPresetTourOptions{
+		Xmlns:        ptzNamespace,
+		ProfileToken: profileToken,
+	}
+	if presetTourToken != "" {
+		req.PresetTourToken = &presetTourToken
+	}
+
+	var resp GetPresetTourOptionsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetPresetTourOptions failed: %w", err)
+	}
+
+	opts := &PTZPresetTourOptions{
+		AutoStart: resp.Options.AutoStart,
+	}
+
+	if resp.Options.StartingCondition != nil {
+		opts.StartingCondition = &PresetTourStartingConditionOptions{}
+
+		if resp.Options.StartingCondition.RecurringTimeRange != nil {
+			opts.StartingCondition.RecurringTimeRange = &IntRange{
+				Min: resp.Options.StartingCondition.RecurringTimeRange.Min,
+				Max: resp.Options.StartingCondition.RecurringTimeRange.Max,
+			}
+		}
+
+		if resp.Options.StartingCondition.RecurringDurationRange != nil {
+			opts.StartingCondition.RecurringDurationRange = &DurationRange{
+				Min: resp.Options.StartingCondition.RecurringDurationRange.Min,
+				Max: resp.Options.StartingCondition.RecurringDurationRange.Max,
+			}
+		}
+	}
+
+	return opts, nil
+}
+
+// CreatePresetTour creates a new preset tour and returns its token.
+func (c *Client) CreatePresetTour(ctx context.Context, profileToken string) (string, error) {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return "", ErrServiceNotSupported
+	}
+
+	type CreatePresetTour struct {
+		XMLName      xml.Name `xml:"tptz:CreatePresetTour"`
+		Xmlns        string   `xml:"xmlns:tptz,attr"`
+		ProfileToken string   `xml:"tptz:ProfileToken"`
+	}
+
+	type CreatePresetTourResponse struct {
+		XMLName         xml.Name `xml:"CreatePresetTourResponse"`
+		PresetTourToken string   `xml:"PresetTourToken"`
+	}
+
+	req := CreatePresetTour{
+		Xmlns:        ptzNamespace,
+		ProfileToken: profileToken,
+	}
+
+	var resp CreatePresetTourResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return "", fmt.Errorf("CreatePresetTour failed: %w", err)
+	}
+
+	return resp.PresetTourToken, nil
+}
+
+// ModifyPresetTour modifies an existing preset tour.
+func (c *Client) ModifyPresetTour(ctx context.Context, profileToken string, presetTour *PresetTour) error {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return ErrServiceNotSupported
+	}
+
+	type presetTourXML struct {
+		Token     string `xml:"token,attr"`
+		Name      string `xml:"tt:Name,omitempty"`
+		AutoStart bool   `xml:"tt:AutoStart"`
+	}
+
+	type ModifyPresetTour struct {
+		XMLName      xml.Name      `xml:"tptz:ModifyPresetTour"`
+		Xmlns        string        `xml:"xmlns:tptz,attr"`
+		XmlnsTT      string        `xml:"xmlns:tt,attr"`
+		ProfileToken string        `xml:"tptz:ProfileToken"`
+		PresetTour   presetTourXML `xml:"tptz:PresetTour"`
+	}
+
+	req := ModifyPresetTour{
+		Xmlns:        ptzNamespace,
+		XmlnsTT:      "http://www.onvif.org/ver10/schema",
+		ProfileToken: profileToken,
+		PresetTour: presetTourXML{
+			Token:     presetTour.Token,
+			Name:      presetTour.Name,
+			AutoStart: presetTour.AutoStart,
+		},
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("ModifyPresetTour failed: %w", err)
+	}
+
+	return nil
+}
+
+// OperatePresetTour controls a preset tour (Start/Stop/Pause/Extended).
+func (c *Client) OperatePresetTour(ctx context.Context, profileToken, presetTourToken, operation string) error {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return ErrServiceNotSupported
+	}
+
+	type OperatePresetTour struct {
+		XMLName         xml.Name `xml:"tptz:OperatePresetTour"`
+		Xmlns           string   `xml:"xmlns:tptz,attr"`
+		ProfileToken    string   `xml:"tptz:ProfileToken"`
+		PresetTourToken string   `xml:"tptz:PresetTourToken"`
+		Operation       string   `xml:"tptz:Operation"`
+	}
+
+	req := OperatePresetTour{
+		Xmlns:           ptzNamespace,
+		ProfileToken:    profileToken,
+		PresetTourToken: presetTourToken,
+		Operation:       operation,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("OperatePresetTour failed: %w", err)
+	}
+
+	return nil
+}
+
+// RemovePresetTour removes a preset tour.
+func (c *Client) RemovePresetTour(ctx context.Context, profileToken, presetTourToken string) error {
+	endpoint := c.ptzEndpoint
+	if endpoint == "" {
+		return ErrServiceNotSupported
+	}
+
+	type RemovePresetTour struct {
+		XMLName         xml.Name `xml:"tptz:RemovePresetTour"`
+		Xmlns           string   `xml:"xmlns:tptz,attr"`
+		ProfileToken    string   `xml:"tptz:ProfileToken"`
+		PresetTourToken string   `xml:"tptz:PresetTourToken"`
+	}
+
+	req := RemovePresetTour{
+		Xmlns:           ptzNamespace,
+		ProfileToken:    profileToken,
+		PresetTourToken: presetTourToken,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("RemovePresetTour failed: %w", err)
+	}
+
+	return nil
+}
+
 // GetCompatiblePTZConfigurationsForProfile retrieves PTZ configurations compatible with a given profile.
 func (c *Client) GetCompatiblePTZConfigurationsForProfile(ctx context.Context, profileToken string) ([]*PTZConfiguration, error) {
 	endpoint := c.ptzEndpoint

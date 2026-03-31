@@ -1296,3 +1296,51 @@ type IntRange struct {
 	Min int
 	Max int
 }
+
+// DurationRange represents a range of duration values (ISO 8601).
+type DurationRange struct {
+	Min string
+	Max string
+}
+
+// PresetTour represents a PTZ preset tour.
+type PresetTour struct {
+	Token             string
+	Name              string
+	Status            string
+	AutoStart         bool
+	StartingCondition *PresetTourStartingCondition
+	TourSpot          []*PresetTourSpot
+}
+
+// PresetTourStartingCondition represents starting conditions for a preset tour.
+type PresetTourStartingCondition struct {
+	RecurringTime     *int
+	RecurringDuration string
+	Direction         string
+}
+
+// PresetTourSpot represents a single spot in a preset tour.
+type PresetTourSpot struct {
+	PresetDetail *PresetTourPresetDetail
+	Speed        *PTZSpeed
+	StayTime     string
+}
+
+// PresetTourPresetDetail represents the preset detail within a tour spot.
+type PresetTourPresetDetail struct {
+	PresetToken string
+	Home        bool
+}
+
+// PTZPresetTourOptions represents options for a PTZ preset tour.
+type PTZPresetTourOptions struct {
+	AutoStart         bool
+	StartingCondition *PresetTourStartingConditionOptions
+}
+
+// PresetTourStartingConditionOptions represents available options for tour starting conditions.
+type PresetTourStartingConditionOptions struct {
+	RecurringTimeRange     *IntRange
+	RecurringDurationRange *DurationRange
+}

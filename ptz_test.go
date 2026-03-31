@@ -415,6 +415,537 @@ func TestGetPTZServiceCapabilities(t *testing.T) {
 	}
 }
 
+// TestGetPresetTours tests GetPresetTours operation.
+func TestGetPresetTours(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful get preset tours",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:GetPresetToursResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+			<tptz:PresetTour token="Tour1">
+				<tt:Name xmlns:tt="http://www.onvif.org/ver10/schema">Tour One</tt:Name>
+				<tt:Status xmlns:tt="http://www.onvif.org/ver10/schema"><tt:State>Idle</tt:State></tt:Status>
+				<tt:AutoStart xmlns:tt="http://www.onvif.org/ver10/schema">false</tt:AutoStart>
+			</tptz:PresetTour>
+		</tptz:GetPresetToursResponse>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">Internal error</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			tours, err := client.GetPresetTours(context.Background(), "Profile1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPresetTours() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if len(tours) != 1 {
+					t.Errorf("Expected 1 tour, got %d", len(tours))
+				}
+
+				if len(tours) > 0 && tours[0].Token != "Tour1" {
+					t.Errorf("Expected token Tour1, got %s", tours[0].Token)
+				}
+
+				if len(tours) > 0 && tours[0].Name != "Tour One" {
+					t.Errorf("Expected name 'Tour One', got %s", tours[0].Name)
+				}
+			}
+		})
+	}
+}
+
+// TestGetPresetTour tests GetPresetTour operation.
+func TestGetPresetTour(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful get preset tour",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:GetPresetTourResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+			<tptz:PresetTour token="Tour1">
+				<tt:Name xmlns:tt="http://www.onvif.org/ver10/schema">Tour One</tt:Name>
+				<tt:Status xmlns:tt="http://www.onvif.org/ver10/schema"><tt:State>Idle</tt:State></tt:Status>
+				<tt:AutoStart xmlns:tt="http://www.onvif.org/ver10/schema">true</tt:AutoStart>
+			</tptz:PresetTour>
+		</tptz:GetPresetTourResponse>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">Tour not found</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			tour, err := client.GetPresetTour(context.Background(), "Profile1", "Tour1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPresetTour() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if tour == nil {
+					t.Fatal("Expected tour, got nil")
+				}
+
+				if tour.Token != "Tour1" {
+					t.Errorf("Expected token Tour1, got %s", tour.Token)
+				}
+
+				if tour.Name != "Tour One" {
+					t.Errorf("Expected name 'Tour One', got %s", tour.Name)
+				}
+
+				if !tour.AutoStart {
+					t.Error("Expected AutoStart to be true")
+				}
+			}
+		})
+	}
+}
+
+// TestGetPresetTourOptions tests GetPresetTourOptions operation.
+func TestGetPresetTourOptions(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful get preset tour options",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:GetPresetTourOptionsResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+			<tptz:Options>
+				<tt:AutoStart xmlns:tt="http://www.onvif.org/ver10/schema">true</tt:AutoStart>
+				<tt:StartingCondition xmlns:tt="http://www.onvif.org/ver10/schema">
+					<tt:RecurringTimeRange>
+						<tt:Min>1</tt:Min>
+						<tt:Max>100</tt:Max>
+					</tt:RecurringTimeRange>
+					<tt:RecurringDurationRange>
+						<tt:Min>PT10S</tt:Min>
+						<tt:Max>PT3600S</tt:Max>
+					</tt:RecurringDurationRange>
+				</tt:StartingCondition>
+			</tptz:Options>
+		</tptz:GetPresetTourOptionsResponse>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">Internal error</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			opts, err := client.GetPresetTourOptions(context.Background(), "Profile1", "Tour1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetPresetTourOptions() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if opts == nil {
+					t.Fatal("Expected options, got nil")
+				}
+
+				if !opts.AutoStart {
+					t.Error("Expected AutoStart to be true")
+				}
+
+				if opts.StartingCondition == nil {
+					t.Fatal("Expected StartingCondition, got nil")
+				}
+
+				if opts.StartingCondition.RecurringTimeRange == nil {
+					t.Fatal("Expected RecurringTimeRange, got nil")
+				}
+
+				if opts.StartingCondition.RecurringTimeRange.Min != 1 {
+					t.Errorf("Expected RecurringTimeRange.Min 1, got %d", opts.StartingCondition.RecurringTimeRange.Min)
+				}
+
+				if opts.StartingCondition.RecurringTimeRange.Max != 100 {
+					t.Errorf("Expected RecurringTimeRange.Max 100, got %d", opts.StartingCondition.RecurringTimeRange.Max)
+				}
+			}
+		})
+	}
+}
+
+// TestCreatePresetTour tests CreatePresetTour operation.
+func TestCreatePresetTour(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful create preset tour",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:CreatePresetTourResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+			<tptz:PresetTourToken>NewTour1</tptz:PresetTourToken>
+		</tptz:CreatePresetTourResponse>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">Internal error</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			token, err := client.CreatePresetTour(context.Background(), "Profile1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreatePresetTour() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && token != "NewTour1" {
+				t.Errorf("Expected token NewTour1, got %s", token)
+			}
+		})
+	}
+}
+
+// TestModifyPresetTour tests ModifyPresetTour operation.
+func TestModifyPresetTour(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful modify preset tour",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:ModifyPresetTourResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl"/>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">Tour not found</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			tour := &PresetTour{
+				Token:     "Tour1",
+				Name:      "Updated Tour",
+				AutoStart: true,
+			}
+
+			err = client.ModifyPresetTour(context.Background(), "Profile1", tour)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ModifyPresetTour() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestOperatePresetTour tests OperatePresetTour operation.
+func TestOperatePresetTour(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful operate preset tour",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:OperatePresetTourResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl"/>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">Tour not found</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			err = client.OperatePresetTour(context.Background(), "Profile1", "Tour1", "Start")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("OperatePresetTour() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestRemovePresetTour tests RemovePresetTour operation.
+func TestRemovePresetTour(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful remove preset tour",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+	<soap:Body>
+		<tptz:RemovePresetTourResponse xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl"/>
+	</soap:Body>
+</soap:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<s:Fault>
+			<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+			<s:Reason><s:Text xml:lang="en">Tour not found</s:Text></s:Reason>
+		</s:Fault>
+	</s:Body>
+</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			client.ptzEndpoint = server.URL
+
+			err = client.RemovePresetTour(context.Background(), "Profile1", "Tour1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("RemovePresetTour() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestGetCompatiblePTZConfigurationsForProfile tests GetCompatiblePTZConfigurationsForProfile operation.
 func TestGetCompatiblePTZConfigurationsForProfile(t *testing.T) {
 	tests := []struct {
