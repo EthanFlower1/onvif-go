@@ -1523,3 +1523,329 @@ func TestGetRecordingJobState(t *testing.T) {
 		})
 	}
 }
+
+func TestExportRecordedData(t *testing.T) {
+	tests := []struct {
+		name          string
+		handler       http.HandlerFunc
+		wantErr       bool
+		wantOpToken   string
+		wantFileCount int
+		wantFirstFile string
+	}{
+		{
+			name: "successful export initiation",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:ExportRecordedDataResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:OperationToken>EXPORT1</trc:OperationToken>
+							<trc:FileNames>
+								<trc:FileName>export1.zip</trc:FileName>
+							</trc:FileNames>
+						</trc:ExportRecordedDataResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:       false,
+			wantOpToken:   "EXPORT1",
+			wantFileCount: 1,
+			wantFirstFile: "export1.zip",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Export failed</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			opToken, fileNames, err := client.ExportRecordedData(
+				context.Background(),
+				"2024-01-01T00:00:00Z",
+				"2024-01-02T00:00:00Z",
+				"REC1",
+				"ONVIF",
+				"ftp://backup/exports",
+			)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ExportRecordedData() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if opToken != tt.wantOpToken {
+					t.Errorf("OperationToken = %q, want %q", opToken, tt.wantOpToken)
+				}
+
+				if len(fileNames) != tt.wantFileCount {
+					t.Errorf("len(FileNames) = %d, want %d", len(fileNames), tt.wantFileCount)
+				}
+
+				if tt.wantFileCount > 0 && len(fileNames) > 0 && fileNames[0] != tt.wantFirstFile {
+					t.Errorf("FileNames[0] = %q, want %q", fileNames[0], tt.wantFirstFile)
+				}
+			}
+		})
+	}
+}
+
+func TestStopExportRecordedData(t *testing.T) {
+	tests := []struct {
+		name         string
+		handler      http.HandlerFunc
+		wantErr      bool
+		wantProgress float64
+		wantFiles    int
+	}{
+		{
+			name: "successful stop export",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:StopExportRecordedDataResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:Progress>0.75</trc:Progress>
+							<trc:FileProgressStatus>
+								<trc:FileProgress>
+									<trc:FileName>export1.zip</trc:FileName>
+									<trc:Progress>0.75</trc:Progress>
+								</trc:FileProgress>
+							</trc:FileProgressStatus>
+						</trc:StopExportRecordedDataResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:      false,
+			wantProgress: 0.75,
+			wantFiles:    1,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Invalid operation token</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			state, err := client.StopExportRecordedData(context.Background(), "EXPORT1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("StopExportRecordedData() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if state == nil {
+					t.Fatal("Expected export state, got nil")
+				}
+
+				if state.Progress != tt.wantProgress {
+					t.Errorf("Progress = %v, want %v", state.Progress, tt.wantProgress)
+				}
+
+				if len(state.FileProgressStatus) != tt.wantFiles {
+					t.Errorf("len(FileProgressStatus) = %d, want %d", len(state.FileProgressStatus), tt.wantFiles)
+				}
+			}
+		})
+	}
+}
+
+func TestGetExportRecordedDataState(t *testing.T) {
+	tests := []struct {
+		name         string
+		handler      http.HandlerFunc
+		wantErr      bool
+		wantProgress float64
+		wantFiles    int
+		wantFileName string
+	}{
+		{
+			name: "successful state retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:GetExportRecordedDataStateResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:Progress>0.5</trc:Progress>
+							<trc:FileProgressStatus>
+								<trc:FileProgress>
+									<trc:FileName>export1.zip</trc:FileName>
+									<trc:Progress>0.5</trc:Progress>
+								</trc:FileProgress>
+							</trc:FileProgressStatus>
+						</trc:GetExportRecordedDataStateResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:      false,
+			wantProgress: 0.5,
+			wantFiles:    1,
+			wantFileName: "export1.zip",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Operation not found</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			state, err := client.GetExportRecordedDataState(context.Background(), "EXPORT1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetExportRecordedDataState() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if state == nil {
+					t.Fatal("Expected export state, got nil")
+				}
+
+				if state.Progress != tt.wantProgress {
+					t.Errorf("Progress = %v, want %v", state.Progress, tt.wantProgress)
+				}
+
+				if len(state.FileProgressStatus) != tt.wantFiles {
+					t.Errorf("len(FileProgressStatus) = %d, want %d", len(state.FileProgressStatus), tt.wantFiles)
+				}
+
+				if tt.wantFiles > 0 && len(state.FileProgressStatus) > 0 {
+					if state.FileProgressStatus[0].FileName != tt.wantFileName {
+						t.Errorf("FileProgressStatus[0].FileName = %q, want %q", state.FileProgressStatus[0].FileName, tt.wantFileName)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestOverrideSegmentDuration(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful override",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:OverrideSegmentDurationResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl"/>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Invalid recording token</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			err = client.OverrideSegmentDuration(context.Background(), "PT10M", "PT1H", "REC1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("OverrideSegmentDuration() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

@@ -834,6 +834,210 @@ func (c *Client) GetRecordingJobState(ctx context.Context, jobToken string) (*Re
 	}, nil
 }
 
+// ExportRecordedData initiates an export of recorded data for the given time range.
+// It returns the operation token and the list of file names that will be exported.
+func (c *Client) ExportRecordedData(
+	ctx context.Context,
+	startPoint, endPoint string,
+	recordingToken string,
+	fileFormat string,
+	storageDestination string,
+) (string, []string, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type SearchScopeReq struct {
+		IncludedRecordings string `xml:"tt:IncludedRecordings"`
+	}
+
+	type StorageDestinationReq struct {
+		StorageUri string `xml:"tt:StorageUri"`
+	}
+
+	type ExportRecordedData struct {
+		XMLName            xml.Name              `xml:"trc:ExportRecordedData"`
+		Xmlns              string                `xml:"xmlns:trc,attr"`
+		XmlnsTt            string                `xml:"xmlns:tt,attr"`
+		StartPoint         string                `xml:"trc:StartPoint"`
+		EndPoint           string                `xml:"trc:EndPoint"`
+		SearchScope        SearchScopeReq        `xml:"trc:SearchScope"`
+		FileFormat         string                `xml:"trc:FileFormat"`
+		StorageDestination StorageDestinationReq `xml:"trc:StorageDestination"`
+	}
+
+	type FileNamesResp struct {
+		FileName []string `xml:"FileName"`
+	}
+
+	type ExportRecordedDataResponse struct {
+		XMLName        xml.Name      `xml:"ExportRecordedDataResponse"`
+		OperationToken string        `xml:"OperationToken"`
+		FileNames      FileNamesResp `xml:"FileNames"`
+	}
+
+	req := ExportRecordedData{
+		Xmlns:      recordingNamespace,
+		XmlnsTt:    "http://www.onvif.org/ver10/schema",
+		StartPoint: startPoint,
+		EndPoint:   endPoint,
+		SearchScope: SearchScopeReq{
+			IncludedRecordings: recordingToken,
+		},
+		FileFormat: fileFormat,
+		StorageDestination: StorageDestinationReq{
+			StorageUri: storageDestination,
+		},
+	}
+
+	var resp ExportRecordedDataResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return "", nil, fmt.Errorf("ExportRecordedData failed: %w", err)
+	}
+
+	return resp.OperationToken, resp.FileNames.FileName, nil
+}
+
+// StopExportRecordedData stops an ongoing export operation and returns its final state.
+func (c *Client) StopExportRecordedData(ctx context.Context, operationToken string) (*ExportRecordedDataState, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type StopExportRecordedData struct {
+		XMLName        xml.Name `xml:"trc:StopExportRecordedData"`
+		Xmlns          string   `xml:"xmlns:trc,attr"`
+		OperationToken string   `xml:"trc:OperationToken"`
+	}
+
+	type FileProgressResp struct {
+		FileName string  `xml:"FileName"`
+		Progress float64 `xml:"Progress"`
+	}
+
+	type FileProgressStatusResp struct {
+		FileProgress []FileProgressResp `xml:"FileProgress"`
+	}
+
+	type StopExportRecordedDataResponse struct {
+		XMLName            xml.Name               `xml:"StopExportRecordedDataResponse"`
+		Progress           float64                `xml:"Progress"`
+		FileProgressStatus FileProgressStatusResp `xml:"FileProgressStatus"`
+	}
+
+	req := StopExportRecordedData{
+		Xmlns:          recordingNamespace,
+		OperationToken: operationToken,
+	}
+
+	var resp StopExportRecordedDataResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("StopExportRecordedData failed: %w", err)
+	}
+
+	fileProgresses := make([]*FileProgress, 0, len(resp.FileProgressStatus.FileProgress))
+	for i := range resp.FileProgressStatus.FileProgress {
+		fp := &resp.FileProgressStatus.FileProgress[i]
+		fileProgresses = append(fileProgresses, &FileProgress{
+			FileName: fp.FileName,
+			Progress: fp.Progress,
+		})
+	}
+
+	return &ExportRecordedDataState{
+		Progress:           resp.Progress,
+		FileProgressStatus: fileProgresses,
+	}, nil
+}
+
+// GetExportRecordedDataState retrieves the current state of an export operation.
+func (c *Client) GetExportRecordedDataState(ctx context.Context, operationToken string) (*ExportRecordedDataState, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type GetExportRecordedDataState struct {
+		XMLName        xml.Name `xml:"trc:GetExportRecordedDataState"`
+		Xmlns          string   `xml:"xmlns:trc,attr"`
+		OperationToken string   `xml:"trc:OperationToken"`
+	}
+
+	type FileProgressResp struct {
+		FileName string  `xml:"FileName"`
+		Progress float64 `xml:"Progress"`
+	}
+
+	type FileProgressStatusResp struct {
+		FileProgress []FileProgressResp `xml:"FileProgress"`
+	}
+
+	type GetExportRecordedDataStateResponse struct {
+		XMLName            xml.Name               `xml:"GetExportRecordedDataStateResponse"`
+		Progress           float64                `xml:"Progress"`
+		FileProgressStatus FileProgressStatusResp `xml:"FileProgressStatus"`
+	}
+
+	req := GetExportRecordedDataState{
+		Xmlns:          recordingNamespace,
+		OperationToken: operationToken,
+	}
+
+	var resp GetExportRecordedDataStateResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetExportRecordedDataState failed: %w", err)
+	}
+
+	fileProgresses := make([]*FileProgress, 0, len(resp.FileProgressStatus.FileProgress))
+	for i := range resp.FileProgressStatus.FileProgress {
+		fp := &resp.FileProgressStatus.FileProgress[i]
+		fileProgresses = append(fileProgresses, &FileProgress{
+			FileName: fp.FileName,
+			Progress: fp.Progress,
+		})
+	}
+
+	return &ExportRecordedDataState{
+		Progress:           resp.Progress,
+		FileProgressStatus: fileProgresses,
+	}, nil
+}
+
+// OverrideSegmentDuration overrides the segment duration for a recording.
+// targetDuration and expiration are ISO 8601 duration strings (e.g. "PT10M", "PT1H").
+func (c *Client) OverrideSegmentDuration(ctx context.Context, targetDuration, expiration, recordingToken string) error {
+	endpoint := c.getRecordingEndpoint()
+
+	type OverrideSegmentDuration struct {
+		XMLName               xml.Name `xml:"trc:OverrideSegmentDuration"`
+		Xmlns                 string   `xml:"xmlns:trc,attr"`
+		TargetSegmentDuration string   `xml:"trc:TargetSegmentDuration"`
+		Expiration            string   `xml:"trc:Expiration"`
+		RecordingConfiguration string  `xml:"trc:RecordingConfiguration"`
+	}
+
+	req := OverrideSegmentDuration{
+		Xmlns:                 recordingNamespace,
+		TargetSegmentDuration: targetDuration,
+		Expiration:            expiration,
+		RecordingConfiguration: recordingToken,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("OverrideSegmentDuration failed: %w", err)
+	}
+
+	return nil
+}
+
 // GetRecordingOptions retrieves the options available for a recording.
 func (c *Client) GetRecordingOptions(ctx context.Context, recordingToken string) (*RecordingOptions, error) {
 	endpoint := c.getRecordingEndpoint()
