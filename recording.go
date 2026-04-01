@@ -356,6 +356,156 @@ func (c *Client) GetRecordingConfiguration(
 	}, nil
 }
 
+// CreateTrack creates a new track within a recording.
+func (c *Client) CreateTrack(ctx context.Context, recordingToken string, config *TrackConfiguration) (string, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type TrackConfigReq struct {
+		TrackType   string `xml:"tt:TrackType"`
+		Description string `xml:"tt:Description,omitempty"`
+	}
+
+	type CreateTrack struct {
+		XMLName            xml.Name       `xml:"trc:CreateTrack"`
+		Xmlns              string         `xml:"xmlns:trc,attr"`
+		XmlnsTt            string         `xml:"xmlns:tt,attr"`
+		RecordingToken     string         `xml:"trc:RecordingToken"`
+		TrackConfiguration TrackConfigReq `xml:"trc:TrackConfiguration"`
+	}
+
+	type CreateTrackResponse struct {
+		XMLName    xml.Name `xml:"CreateTrackResponse"`
+		TrackToken string   `xml:"TrackToken"`
+	}
+
+	req := CreateTrack{
+		Xmlns:          recordingNamespace,
+		XmlnsTt:        "http://www.onvif.org/ver10/schema",
+		RecordingToken: recordingToken,
+		TrackConfiguration: TrackConfigReq{
+			TrackType:   config.TrackType,
+			Description: config.Description,
+		},
+	}
+
+	var resp CreateTrackResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return "", fmt.Errorf("CreateTrack failed: %w", err)
+	}
+
+	return resp.TrackToken, nil
+}
+
+// DeleteTrack deletes a track from a recording.
+func (c *Client) DeleteTrack(ctx context.Context, recordingToken, trackToken string) error {
+	endpoint := c.getRecordingEndpoint()
+
+	type DeleteTrack struct {
+		XMLName        xml.Name `xml:"trc:DeleteTrack"`
+		Xmlns          string   `xml:"xmlns:trc,attr"`
+		RecordingToken string   `xml:"trc:RecordingToken"`
+		TrackToken     string   `xml:"trc:TrackToken"`
+	}
+
+	req := DeleteTrack{
+		Xmlns:          recordingNamespace,
+		RecordingToken: recordingToken,
+		TrackToken:     trackToken,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("DeleteTrack failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetTrackConfiguration retrieves the configuration of a track within a recording.
+func (c *Client) GetTrackConfiguration(ctx context.Context, recordingToken, trackToken string) (*TrackConfiguration, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type GetTrackConfiguration struct {
+		XMLName        xml.Name `xml:"trc:GetTrackConfiguration"`
+		Xmlns          string   `xml:"xmlns:trc,attr"`
+		RecordingToken string   `xml:"trc:RecordingToken"`
+		TrackToken     string   `xml:"trc:TrackToken"`
+	}
+
+	type GetTrackConfigurationResponse struct {
+		XMLName            xml.Name `xml:"GetTrackConfigurationResponse"`
+		TrackConfiguration struct {
+			TrackType   string `xml:"TrackType"`
+			Description string `xml:"Description"`
+		} `xml:"TrackConfiguration"`
+	}
+
+	req := GetTrackConfiguration{
+		Xmlns:          recordingNamespace,
+		RecordingToken: recordingToken,
+		TrackToken:     trackToken,
+	}
+
+	var resp GetTrackConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetTrackConfiguration failed: %w", err)
+	}
+
+	return &TrackConfiguration{
+		TrackType:   resp.TrackConfiguration.TrackType,
+		Description: resp.TrackConfiguration.Description,
+	}, nil
+}
+
+// SetTrackConfiguration updates the configuration of a track within a recording.
+func (c *Client) SetTrackConfiguration(ctx context.Context, recordingToken, trackToken string, config *TrackConfiguration) error {
+	endpoint := c.getRecordingEndpoint()
+
+	type TrackConfigReq struct {
+		TrackType   string `xml:"tt:TrackType"`
+		Description string `xml:"tt:Description,omitempty"`
+	}
+
+	type SetTrackConfiguration struct {
+		XMLName            xml.Name       `xml:"trc:SetTrackConfiguration"`
+		Xmlns              string         `xml:"xmlns:trc,attr"`
+		XmlnsTt            string         `xml:"xmlns:tt,attr"`
+		RecordingToken     string         `xml:"trc:RecordingToken"`
+		TrackToken         string         `xml:"trc:TrackToken"`
+		TrackConfiguration TrackConfigReq `xml:"trc:TrackConfiguration"`
+	}
+
+	req := SetTrackConfiguration{
+		Xmlns:          recordingNamespace,
+		XmlnsTt:        "http://www.onvif.org/ver10/schema",
+		RecordingToken: recordingToken,
+		TrackToken:     trackToken,
+		TrackConfiguration: TrackConfigReq{
+			TrackType:   config.TrackType,
+			Description: config.Description,
+		},
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("SetTrackConfiguration failed: %w", err)
+	}
+
+	return nil
+}
+
 // GetRecordingOptions retrieves the options available for a recording.
 func (c *Client) GetRecordingOptions(ctx context.Context, recordingToken string) (*RecordingOptions, error) {
 	endpoint := c.getRecordingEndpoint()

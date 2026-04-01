@@ -535,6 +535,281 @@ func TestGetRecordingConfiguration(t *testing.T) {
 	}
 }
 
+func TestCreateTrack(t *testing.T) {
+	tests := []struct {
+		name      string
+		handler   http.HandlerFunc
+		wantErr   bool
+		wantToken string
+	}{
+		{
+			name: "successful track creation",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:CreateTrackResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:TrackToken>TRACK_NEW</trc:TrackToken>
+						</trc:CreateTrackResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:   false,
+			wantToken: "TRACK_NEW",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Maximum tracks reached</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			config := &TrackConfiguration{
+				TrackType:   "Video",
+				Description: "Video track",
+			}
+
+			token, err := client.CreateTrack(context.Background(), "REC1", config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateTrack() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if token != tt.wantToken {
+					t.Errorf("TrackToken = %q, want %q", token, tt.wantToken)
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteTrack(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful track deletion",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:DeleteTrackResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl"/>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Track not found</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			err = client.DeleteTrack(context.Background(), "REC1", "TRACK1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeleteTrack() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetTrackConfiguration(t *testing.T) {
+	tests := []struct {
+		name          string
+		handler       http.HandlerFunc
+		wantErr       bool
+		wantTrackType string
+		wantDesc      string
+	}{
+		{
+			name: "successful track configuration retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:GetTrackConfigurationResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:TrackConfiguration>
+								<tt:TrackType xmlns:tt="http://www.onvif.org/ver10/schema">Video</tt:TrackType>
+								<tt:Description xmlns:tt="http://www.onvif.org/ver10/schema">Video track</tt:Description>
+							</trc:TrackConfiguration>
+						</trc:GetTrackConfigurationResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:       false,
+			wantTrackType: "Video",
+			wantDesc:      "Video track",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Track not found</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			config, err := client.GetTrackConfiguration(context.Background(), "REC1", "TRACK1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetTrackConfiguration() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if config == nil {
+					t.Fatal("Expected track configuration, got nil")
+				}
+
+				if config.TrackType != tt.wantTrackType {
+					t.Errorf("TrackType = %q, want %q", config.TrackType, tt.wantTrackType)
+				}
+
+				if config.Description != tt.wantDesc {
+					t.Errorf("Description = %q, want %q", config.Description, tt.wantDesc)
+				}
+			}
+		})
+	}
+}
+
+func TestSetTrackConfiguration(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful track configuration update",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:SetTrackConfigurationResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl"/>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Invalid track token</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			config := &TrackConfiguration{
+				TrackType:   "Audio",
+				Description: "Updated audio track",
+			}
+
+			err = client.SetTrackConfiguration(context.Background(), "REC1", "TRACK1", config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SetTrackConfiguration() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestGetRecordingOptions(t *testing.T) {
 	spareTotal := 5
 	spareVideo := 2
