@@ -468,6 +468,508 @@ func TestGetAnalyticsModules(t *testing.T) {
 	}
 }
 
+func TestGetAnalyticsDeviceServiceCapabilities(t *testing.T) {
+	tests := []struct {
+		name            string
+		handler         http.HandlerFunc
+		wantErr         bool
+		wantRuleSupport bool
+	}{
+		{
+			name: "successful capabilities retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tad:GetServiceCapabilitiesResponse xmlns:tad="http://www.onvif.org/ver10/analyticsdevice/wsdl">
+							<tad:Capabilities RuleSupport="true"/>
+						</tad:GetServiceCapabilitiesResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:         false,
+			wantRuleSupport: true,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Internal error</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			caps, err := client.GetAnalyticsDeviceServiceCapabilities(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAnalyticsDeviceServiceCapabilities() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if caps == nil {
+					t.Fatal("Expected capabilities, got nil")
+				}
+
+				if caps.RuleSupport != tt.wantRuleSupport {
+					t.Errorf("RuleSupport = %v, want %v", caps.RuleSupport, tt.wantRuleSupport)
+				}
+			}
+		})
+	}
+}
+
+func TestGetAnalyticsEngines(t *testing.T) {
+	tests := []struct {
+		name       string
+		handler    http.HandlerFunc
+		wantErr    bool
+		wantCount  int
+		checkFirst func(t *testing.T, engine *AnalyticsEngine)
+	}{
+		{
+			name: "successful engines retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tad:GetAnalyticsEnginesResponse xmlns:tad="http://www.onvif.org/ver10/analyticsdevice/wsdl">
+							<tad:AnalyticsEngine token="eng1">
+								<tad:Name>Analytics Engine 1</tad:Name>
+							</tad:AnalyticsEngine>
+							<tad:AnalyticsEngine token="eng2">
+								<tad:Name>Analytics Engine 2</tad:Name>
+							</tad:AnalyticsEngine>
+						</tad:GetAnalyticsEnginesResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:   false,
+			wantCount: 2,
+			checkFirst: func(t *testing.T, engine *AnalyticsEngine) {
+				t.Helper()
+
+				if engine.Token != "eng1" {
+					t.Errorf("Token = %v, want eng1", engine.Token)
+				}
+
+				if engine.Name != "Analytics Engine 1" {
+					t.Errorf("Name = %v, want Analytics Engine 1", engine.Name)
+				}
+			},
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Not supported</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			engines, err := client.GetAnalyticsEngines(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAnalyticsEngines() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if len(engines) != tt.wantCount {
+					t.Errorf("Expected %d engines, got %d", tt.wantCount, len(engines))
+
+					return
+				}
+
+				if tt.checkFirst != nil && len(engines) > 0 {
+					tt.checkFirst(t, engines[0])
+				}
+			}
+		})
+	}
+}
+
+func TestGetAnalyticsEngineControls(t *testing.T) {
+	tests := []struct {
+		name       string
+		handler    http.HandlerFunc
+		wantErr    bool
+		wantCount  int
+		checkFirst func(t *testing.T, control *AnalyticsEngineControl)
+	}{
+		{
+			name: "successful engine controls retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tad:GetAnalyticsEngineControlsResponse xmlns:tad="http://www.onvif.org/ver10/analyticsdevice/wsdl">
+							<tad:AnalyticsEngineControl token="ctrl1">
+								<tad:Name>Control 1</tad:Name>
+								<tad:EngineToken>eng1</tad:EngineToken>
+								<tad:Mode>Active</tad:Mode>
+							</tad:AnalyticsEngineControl>
+						</tad:GetAnalyticsEngineControlsResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:   false,
+			wantCount: 1,
+			checkFirst: func(t *testing.T, control *AnalyticsEngineControl) {
+				t.Helper()
+
+				if control.Token != "ctrl1" {
+					t.Errorf("Token = %v, want ctrl1", control.Token)
+				}
+
+				if control.Name != "Control 1" {
+					t.Errorf("Name = %v, want Control 1", control.Name)
+				}
+
+				if control.EngineToken != "eng1" {
+					t.Errorf("EngineToken = %v, want eng1", control.EngineToken)
+				}
+			},
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Service error</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			controls, err := client.GetAnalyticsEngineControls(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAnalyticsEngineControls() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if len(controls) != tt.wantCount {
+					t.Errorf("Expected %d controls, got %d", tt.wantCount, len(controls))
+
+					return
+				}
+
+				if tt.checkFirst != nil && len(controls) > 0 {
+					tt.checkFirst(t, controls[0])
+				}
+			}
+		})
+	}
+}
+
+func TestGetAnalyticsEngineInputs(t *testing.T) {
+	tests := []struct {
+		name       string
+		handler    http.HandlerFunc
+		wantErr    bool
+		wantCount  int
+		checkFirst func(t *testing.T, input *AnalyticsEngineInput)
+	}{
+		{
+			name: "successful engine inputs retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tad:GetAnalyticsEngineInputsResponse xmlns:tad="http://www.onvif.org/ver10/analyticsdevice/wsdl">
+							<tad:AnalyticsEngineInput token="inp1">
+								<tad:Name>Input 1</tad:Name>
+							</tad:AnalyticsEngineInput>
+							<tad:AnalyticsEngineInput token="inp2">
+								<tad:Name>Input 2</tad:Name>
+							</tad:AnalyticsEngineInput>
+						</tad:GetAnalyticsEngineInputsResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:   false,
+			wantCount: 2,
+			checkFirst: func(t *testing.T, input *AnalyticsEngineInput) {
+				t.Helper()
+
+				if input.Token != "inp1" {
+					t.Errorf("Token = %v, want inp1", input.Token)
+				}
+
+				if input.Name != "Input 1" {
+					t.Errorf("Name = %v, want Input 1", input.Name)
+				}
+			},
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Service unavailable</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			inputs, err := client.GetAnalyticsEngineInputs(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAnalyticsEngineInputs() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if len(inputs) != tt.wantCount {
+					t.Errorf("Expected %d inputs, got %d", tt.wantCount, len(inputs))
+
+					return
+				}
+
+				if tt.checkFirst != nil && len(inputs) > 0 {
+					tt.checkFirst(t, inputs[0])
+				}
+			}
+		})
+	}
+}
+
+func TestGetAnalyticsDeviceStreamUri(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+		wantURI string
+	}{
+		{
+			name: "successful stream URI retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tad:GetAnalyticsDeviceStreamUriResponse xmlns:tad="http://www.onvif.org/ver10/analyticsdevice/wsdl">
+							<tad:Uri>rtsp://192.168.1.1/analytics/stream1</tad:Uri>
+						</tad:GetAnalyticsDeviceStreamUriResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+			wantURI: "rtsp://192.168.1.1/analytics/stream1",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Invalid token</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			setup := &StreamSetup{
+				Stream:    "RTP-Unicast",
+				Transport: &Transport{Protocol: "RTSP"},
+			}
+
+			uri, err := client.GetAnalyticsDeviceStreamUri(context.Background(), setup, "ctrl1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAnalyticsDeviceStreamUri() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if uri != tt.wantURI {
+					t.Errorf("URI = %v, want %v", uri, tt.wantURI)
+				}
+			}
+		})
+	}
+}
+
+func TestGetAnalyticsState(t *testing.T) {
+	tests := []struct {
+		name       string
+		handler    http.HandlerFunc
+		wantErr    bool
+		wantState  string
+	}{
+		{
+			name: "successful analytics state retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<tad:GetAnalyticsStateResponse xmlns:tad="http://www.onvif.org/ver10/analyticsdevice/wsdl">
+							<tad:State>
+								<tad:State>Active</tad:State>
+								<tad:Error/>
+							</tad:State>
+						</tad:GetAnalyticsStateResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:   false,
+			wantState: "Active",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Sender</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Invalid control token</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			state, err := client.GetAnalyticsState(context.Background(), "ctrl1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAnalyticsState() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if state == nil {
+					t.Fatal("Expected state, got nil")
+				}
+
+				if state.State != tt.wantState {
+					t.Errorf("State = %v, want %v", state.State, tt.wantState)
+				}
+			}
+		})
+	}
+}
+
 func TestGetSupportedMetadata(t *testing.T) {
 	tests := []struct {
 		name      string

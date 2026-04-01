@@ -11,6 +11,9 @@ import (
 // Analytics service namespace.
 const analyticsNamespace = "http://www.onvif.org/ver20/analytics/wsdl"
 
+// AnalyticsDevice service namespace (ver10).
+const analyticsDeviceNamespace = "http://www.onvif.org/ver10/analyticsdevice/wsdl"
+
 func (c *Client) getAnalyticsEndpoint() string {
 	if c.analyticsEndpoint != "" {
 		return c.analyticsEndpoint
@@ -726,4 +729,671 @@ func (c *Client) GetSupportedMetadata(ctx context.Context, configToken string) (
 	return &SupportedMetadata{
 		AnalyticsModules: resp.SupportedMetadata.AnalyticsModule,
 	}, nil
+}
+
+// GetAnalyticsDeviceServiceCapabilities retrieves the capabilities of the analytics device service.
+func (c *Client) GetAnalyticsDeviceServiceCapabilities(ctx context.Context) (*AnalyticsDeviceServiceCapabilities, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type GetServiceCapabilities struct {
+		XMLName xml.Name `xml:"tad:GetServiceCapabilities"`
+		Xmlns   string   `xml:"xmlns:tad,attr"`
+	}
+
+	type GetServiceCapabilitiesResponse struct {
+		XMLName      xml.Name `xml:"GetServiceCapabilitiesResponse"`
+		Capabilities struct {
+			RuleSupport bool `xml:"RuleSupport,attr"`
+		} `xml:"Capabilities"`
+	}
+
+	req := GetServiceCapabilities{
+		Xmlns: analyticsDeviceNamespace,
+	}
+
+	var resp GetServiceCapabilitiesResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAnalyticsDeviceServiceCapabilities failed: %w", err)
+	}
+
+	return &AnalyticsDeviceServiceCapabilities{
+		RuleSupport: resp.Capabilities.RuleSupport,
+	}, nil
+}
+
+// GetAnalyticsEngines retrieves all analytics engines available on the device.
+func (c *Client) GetAnalyticsEngines(ctx context.Context) ([]*AnalyticsEngine, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type GetAnalyticsEngines struct {
+		XMLName xml.Name `xml:"tad:GetAnalyticsEngines"`
+		Xmlns   string   `xml:"xmlns:tad,attr"`
+	}
+
+	type EngineEntry struct {
+		Token string `xml:"token,attr"`
+		Name  string `xml:"Name"`
+	}
+
+	type GetAnalyticsEnginesResponse struct {
+		XMLName         xml.Name      `xml:"GetAnalyticsEnginesResponse"`
+		AnalyticsEngine []EngineEntry `xml:"AnalyticsEngine"`
+	}
+
+	req := GetAnalyticsEngines{
+		Xmlns: analyticsDeviceNamespace,
+	}
+
+	var resp GetAnalyticsEnginesResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAnalyticsEngines failed: %w", err)
+	}
+
+	engines := make([]*AnalyticsEngine, 0, len(resp.AnalyticsEngine))
+	for i := range resp.AnalyticsEngine {
+		engines = append(engines, &AnalyticsEngine{
+			Token: resp.AnalyticsEngine[i].Token,
+			Name:  resp.AnalyticsEngine[i].Name,
+		})
+	}
+
+	return engines, nil
+}
+
+// GetAnalyticsEngine retrieves a specific analytics engine by token.
+func (c *Client) GetAnalyticsEngine(ctx context.Context, token string) (*AnalyticsEngine, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type GetAnalyticsEngine struct {
+		XMLName               xml.Name `xml:"tad:GetAnalyticsEngine"`
+		Xmlns                 string   `xml:"xmlns:tad,attr"`
+		AnalyticsEngineToken  string   `xml:"tad:AnalyticsEngineToken"`
+	}
+
+	type EngineEntry struct {
+		Token string `xml:"token,attr"`
+		Name  string `xml:"Name"`
+	}
+
+	type GetAnalyticsEngineResponse struct {
+		XMLName         xml.Name    `xml:"GetAnalyticsEngineResponse"`
+		AnalyticsEngine EngineEntry `xml:"AnalyticsEngine"`
+	}
+
+	req := GetAnalyticsEngine{
+		Xmlns:                analyticsDeviceNamespace,
+		AnalyticsEngineToken: token,
+	}
+
+	var resp GetAnalyticsEngineResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAnalyticsEngine failed: %w", err)
+	}
+
+	return &AnalyticsEngine{
+		Token: resp.AnalyticsEngine.Token,
+		Name:  resp.AnalyticsEngine.Name,
+	}, nil
+}
+
+// GetAnalyticsEngineControls retrieves all analytics engine controls.
+func (c *Client) GetAnalyticsEngineControls(ctx context.Context) ([]*AnalyticsEngineControl, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type GetAnalyticsEngineControls struct {
+		XMLName xml.Name `xml:"tad:GetAnalyticsEngineControls"`
+		Xmlns   string   `xml:"xmlns:tad,attr"`
+	}
+
+	type ControlEntry struct {
+		Token       string `xml:"token,attr"`
+		Name        string `xml:"Name"`
+		EngineToken string `xml:"EngineToken"`
+		Mode        string `xml:"Mode"`
+	}
+
+	type GetAnalyticsEngineControlsResponse struct {
+		XMLName                xml.Name       `xml:"GetAnalyticsEngineControlsResponse"`
+		AnalyticsEngineControl []ControlEntry `xml:"AnalyticsEngineControl"`
+	}
+
+	req := GetAnalyticsEngineControls{
+		Xmlns: analyticsDeviceNamespace,
+	}
+
+	var resp GetAnalyticsEngineControlsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAnalyticsEngineControls failed: %w", err)
+	}
+
+	controls := make([]*AnalyticsEngineControl, 0, len(resp.AnalyticsEngineControl))
+	for i := range resp.AnalyticsEngineControl {
+		controls = append(controls, &AnalyticsEngineControl{
+			Token:       resp.AnalyticsEngineControl[i].Token,
+			Name:        resp.AnalyticsEngineControl[i].Name,
+			EngineToken: resp.AnalyticsEngineControl[i].EngineToken,
+			Mode:        resp.AnalyticsEngineControl[i].Mode,
+		})
+	}
+
+	return controls, nil
+}
+
+// GetAnalyticsEngineControl retrieves a specific analytics engine control by token.
+func (c *Client) GetAnalyticsEngineControl(ctx context.Context, token string) (*AnalyticsEngineControl, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type GetAnalyticsEngineControl struct {
+		XMLName                      xml.Name `xml:"tad:GetAnalyticsEngineControl"`
+		Xmlns                        string   `xml:"xmlns:tad,attr"`
+		AnalyticsEngineControlToken  string   `xml:"tad:AnalyticsEngineControlToken"`
+	}
+
+	type ControlEntry struct {
+		Token       string `xml:"token,attr"`
+		Name        string `xml:"Name"`
+		EngineToken string `xml:"EngineToken"`
+		Mode        string `xml:"Mode"`
+	}
+
+	type GetAnalyticsEngineControlResponse struct {
+		XMLName                xml.Name     `xml:"GetAnalyticsEngineControlResponse"`
+		AnalyticsEngineControl ControlEntry `xml:"AnalyticsEngineControl"`
+	}
+
+	req := GetAnalyticsEngineControl{
+		Xmlns:                       analyticsDeviceNamespace,
+		AnalyticsEngineControlToken: token,
+	}
+
+	var resp GetAnalyticsEngineControlResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAnalyticsEngineControl failed: %w", err)
+	}
+
+	return &AnalyticsEngineControl{
+		Token:       resp.AnalyticsEngineControl.Token,
+		Name:        resp.AnalyticsEngineControl.Name,
+		EngineToken: resp.AnalyticsEngineControl.EngineToken,
+		Mode:        resp.AnalyticsEngineControl.Mode,
+	}, nil
+}
+
+// CreateAnalyticsEngineControl creates a new analytics engine control and returns its token.
+func (c *Client) CreateAnalyticsEngineControl(ctx context.Context, control *AnalyticsEngineControl) (string, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type ControlEntry struct {
+		XMLName     xml.Name `xml:"tad:AnalyticsEngineControl"`
+		Name        string   `xml:"tad:Name,omitempty"`
+		EngineToken string   `xml:"tad:EngineToken,omitempty"`
+		Mode        string   `xml:"tad:Mode,omitempty"`
+	}
+
+	type CreateAnalyticsEngineControl struct {
+		XMLName xml.Name     `xml:"tad:CreateAnalyticsEngineControl"`
+		Xmlns   string       `xml:"xmlns:tad,attr"`
+		Control ControlEntry `xml:"tad:AnalyticsEngineControl"`
+	}
+
+	type CreateAnalyticsEngineControlResponse struct {
+		XMLName xml.Name `xml:"CreateAnalyticsEngineControlResponse"`
+		Token   string   `xml:"Token"`
+	}
+
+	req := CreateAnalyticsEngineControl{
+		Xmlns: analyticsDeviceNamespace,
+		Control: ControlEntry{
+			Name:        control.Name,
+			EngineToken: control.EngineToken,
+			Mode:        control.Mode,
+		},
+	}
+
+	var resp CreateAnalyticsEngineControlResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return "", fmt.Errorf("CreateAnalyticsEngineControl failed: %w", err)
+	}
+
+	return resp.Token, nil
+}
+
+// SetAnalyticsEngineControl updates an existing analytics engine control.
+func (c *Client) SetAnalyticsEngineControl(ctx context.Context, control *AnalyticsEngineControl) error {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type ControlEntry struct {
+		XMLName     xml.Name `xml:"tad:AnalyticsEngineControl"`
+		Token       string   `xml:"token,attr"`
+		Name        string   `xml:"tad:Name,omitempty"`
+		EngineToken string   `xml:"tad:EngineToken,omitempty"`
+		Mode        string   `xml:"tad:Mode,omitempty"`
+	}
+
+	type SetAnalyticsEngineControl struct {
+		XMLName xml.Name     `xml:"tad:SetAnalyticsEngineControl"`
+		Xmlns   string       `xml:"xmlns:tad,attr"`
+		Control ControlEntry `xml:"tad:AnalyticsEngineControl"`
+	}
+
+	req := SetAnalyticsEngineControl{
+		Xmlns: analyticsDeviceNamespace,
+		Control: ControlEntry{
+			Token:       control.Token,
+			Name:        control.Name,
+			EngineToken: control.EngineToken,
+			Mode:        control.Mode,
+		},
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("SetAnalyticsEngineControl failed: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteAnalyticsEngineControl deletes an analytics engine control by token.
+func (c *Client) DeleteAnalyticsEngineControl(ctx context.Context, token string) error {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type DeleteAnalyticsEngineControl struct {
+		XMLName                      xml.Name `xml:"tad:DeleteAnalyticsEngineControl"`
+		Xmlns                        string   `xml:"xmlns:tad,attr"`
+		AnalyticsEngineControlToken  string   `xml:"tad:AnalyticsEngineControlToken"`
+	}
+
+	req := DeleteAnalyticsEngineControl{
+		Xmlns:                       analyticsDeviceNamespace,
+		AnalyticsEngineControlToken: token,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("DeleteAnalyticsEngineControl failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetAnalyticsEngineInputs retrieves all analytics engine inputs.
+func (c *Client) GetAnalyticsEngineInputs(ctx context.Context) ([]*AnalyticsEngineInput, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type GetAnalyticsEngineInputs struct {
+		XMLName xml.Name `xml:"tad:GetAnalyticsEngineInputs"`
+		Xmlns   string   `xml:"xmlns:tad,attr"`
+	}
+
+	type InputEntry struct {
+		Token string `xml:"token,attr"`
+		Name  string `xml:"Name"`
+	}
+
+	type GetAnalyticsEngineInputsResponse struct {
+		XMLName              xml.Name     `xml:"GetAnalyticsEngineInputsResponse"`
+		AnalyticsEngineInput []InputEntry `xml:"AnalyticsEngineInput"`
+	}
+
+	req := GetAnalyticsEngineInputs{
+		Xmlns: analyticsDeviceNamespace,
+	}
+
+	var resp GetAnalyticsEngineInputsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAnalyticsEngineInputs failed: %w", err)
+	}
+
+	inputs := make([]*AnalyticsEngineInput, 0, len(resp.AnalyticsEngineInput))
+	for i := range resp.AnalyticsEngineInput {
+		inputs = append(inputs, &AnalyticsEngineInput{
+			Token: resp.AnalyticsEngineInput[i].Token,
+			Name:  resp.AnalyticsEngineInput[i].Name,
+		})
+	}
+
+	return inputs, nil
+}
+
+// GetAnalyticsEngineInput retrieves a specific analytics engine input by token.
+func (c *Client) GetAnalyticsEngineInput(ctx context.Context, token string) (*AnalyticsEngineInput, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type GetAnalyticsEngineInput struct {
+		XMLName                    xml.Name `xml:"tad:GetAnalyticsEngineInput"`
+		Xmlns                      string   `xml:"xmlns:tad,attr"`
+		AnalyticsEngineInputToken  string   `xml:"tad:AnalyticsEngineInputToken"`
+	}
+
+	type InputEntry struct {
+		Token string `xml:"token,attr"`
+		Name  string `xml:"Name"`
+	}
+
+	type GetAnalyticsEngineInputResponse struct {
+		XMLName              xml.Name   `xml:"GetAnalyticsEngineInputResponse"`
+		AnalyticsEngineInput InputEntry `xml:"AnalyticsEngineInput"`
+	}
+
+	req := GetAnalyticsEngineInput{
+		Xmlns:                     analyticsDeviceNamespace,
+		AnalyticsEngineInputToken: token,
+	}
+
+	var resp GetAnalyticsEngineInputResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAnalyticsEngineInput failed: %w", err)
+	}
+
+	return &AnalyticsEngineInput{
+		Token: resp.AnalyticsEngineInput.Token,
+		Name:  resp.AnalyticsEngineInput.Name,
+	}, nil
+}
+
+// CreateAnalyticsEngineInputs creates a new analytics engine input and returns its token.
+func (c *Client) CreateAnalyticsEngineInputs(ctx context.Context, input *AnalyticsEngineInput) (string, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type InputEntry struct {
+		XMLName xml.Name `xml:"tad:AnalyticsEngineInput"`
+		Name    string   `xml:"tad:Name,omitempty"`
+	}
+
+	type CreateAnalyticsEngineInputs struct {
+		XMLName xml.Name   `xml:"tad:CreateAnalyticsEngineInputs"`
+		Xmlns   string     `xml:"xmlns:tad,attr"`
+		Input   InputEntry `xml:"tad:AnalyticsEngineInput"`
+	}
+
+	type CreateAnalyticsEngineInputsResponse struct {
+		XMLName xml.Name `xml:"CreateAnalyticsEngineInputsResponse"`
+		Token   string   `xml:"Token"`
+	}
+
+	req := CreateAnalyticsEngineInputs{
+		Xmlns: analyticsDeviceNamespace,
+		Input: InputEntry{
+			Name: input.Name,
+		},
+	}
+
+	var resp CreateAnalyticsEngineInputsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return "", fmt.Errorf("CreateAnalyticsEngineInputs failed: %w", err)
+	}
+
+	return resp.Token, nil
+}
+
+// SetAnalyticsEngineInput updates an existing analytics engine input.
+func (c *Client) SetAnalyticsEngineInput(ctx context.Context, input *AnalyticsEngineInput) error {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type InputEntry struct {
+		XMLName xml.Name `xml:"tad:AnalyticsEngineInput"`
+		Token   string   `xml:"token,attr"`
+		Name    string   `xml:"tad:Name,omitempty"`
+	}
+
+	type SetAnalyticsEngineInput struct {
+		XMLName xml.Name   `xml:"tad:SetAnalyticsEngineInput"`
+		Xmlns   string     `xml:"xmlns:tad,attr"`
+		Input   InputEntry `xml:"tad:AnalyticsEngineInput"`
+	}
+
+	req := SetAnalyticsEngineInput{
+		Xmlns: analyticsDeviceNamespace,
+		Input: InputEntry{
+			Token: input.Token,
+			Name:  input.Name,
+		},
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("SetAnalyticsEngineInput failed: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteAnalyticsEngineInputs deletes an analytics engine input by token.
+func (c *Client) DeleteAnalyticsEngineInputs(ctx context.Context, token string) error {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type DeleteAnalyticsEngineInputs struct {
+		XMLName                   xml.Name `xml:"tad:DeleteAnalyticsEngineInputs"`
+		Xmlns                     string   `xml:"xmlns:tad,attr"`
+		AnalyticsEngineInputToken string   `xml:"tad:AnalyticsEngineInputToken"`
+	}
+
+	req := DeleteAnalyticsEngineInputs{
+		Xmlns:                     analyticsDeviceNamespace,
+		AnalyticsEngineInputToken: token,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("DeleteAnalyticsEngineInputs failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetAnalyticsDeviceStreamUri retrieves the stream URI for an analytics engine control.
+func (c *Client) GetAnalyticsDeviceStreamUri(ctx context.Context, streamSetup *StreamSetup, analyticsEngineControlToken string) (string, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type TransportEntry struct {
+		XMLName  xml.Name `xml:"tad:Transport"`
+		Protocol string   `xml:"tad:Protocol"`
+	}
+
+	type StreamSetupEntry struct {
+		XMLName   xml.Name       `xml:"tad:StreamSetup"`
+		Stream    string         `xml:"tad:Stream"`
+		Transport TransportEntry `xml:"tad:Transport"`
+	}
+
+	type GetAnalyticsDeviceStreamUri struct {
+		XMLName                      xml.Name         `xml:"tad:GetAnalyticsDeviceStreamUri"`
+		Xmlns                        string           `xml:"xmlns:tad,attr"`
+		StreamSetup                  StreamSetupEntry `xml:"tad:StreamSetup"`
+		AnalyticsEngineControlToken  string           `xml:"tad:AnalyticsEngineControlToken"`
+	}
+
+	type GetAnalyticsDeviceStreamUriResponse struct {
+		XMLName xml.Name `xml:"GetAnalyticsDeviceStreamUriResponse"`
+		Uri     string   `xml:"Uri"`
+	}
+
+	var protocol string
+	if streamSetup != nil && streamSetup.Transport != nil {
+		protocol = streamSetup.Transport.Protocol
+	}
+
+	var stream string
+	if streamSetup != nil {
+		stream = streamSetup.Stream
+	}
+
+	req := GetAnalyticsDeviceStreamUri{
+		Xmlns: analyticsDeviceNamespace,
+		StreamSetup: StreamSetupEntry{
+			Stream: stream,
+			Transport: TransportEntry{
+				Protocol: protocol,
+			},
+		},
+		AnalyticsEngineControlToken: analyticsEngineControlToken,
+	}
+
+	var resp GetAnalyticsDeviceStreamUriResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return "", fmt.Errorf("GetAnalyticsDeviceStreamUri failed: %w", err)
+	}
+
+	return resp.Uri, nil
+}
+
+// GetAnalyticsState retrieves the current state of an analytics engine control.
+func (c *Client) GetAnalyticsState(ctx context.Context, analyticsEngineControlToken string) (*AnalyticsState, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type GetAnalyticsState struct {
+		XMLName                      xml.Name `xml:"tad:GetAnalyticsState"`
+		Xmlns                        string   `xml:"xmlns:tad,attr"`
+		AnalyticsEngineControlToken  string   `xml:"tad:AnalyticsEngineControlToken"`
+	}
+
+	type GetAnalyticsStateResponse struct {
+		XMLName xml.Name `xml:"GetAnalyticsStateResponse"`
+		State   struct {
+			State string `xml:"State"`
+			Error string `xml:"Error"`
+		} `xml:"State"`
+	}
+
+	req := GetAnalyticsState{
+		Xmlns:                       analyticsDeviceNamespace,
+		AnalyticsEngineControlToken: analyticsEngineControlToken,
+	}
+
+	var resp GetAnalyticsStateResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAnalyticsState failed: %w", err)
+	}
+
+	return &AnalyticsState{
+		State: resp.State.State,
+		Error: resp.State.Error,
+	}, nil
+}
+
+// GetAnalyticsDeviceVideoAnalyticsConfiguration retrieves the video analytics configuration for a token.
+func (c *Client) GetAnalyticsDeviceVideoAnalyticsConfiguration(ctx context.Context, configToken string) (*VideoAnalyticsConfiguration, error) {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type GetAnalyticsDeviceVideoAnalyticsConfiguration struct {
+		XMLName     xml.Name `xml:"tad:GetAnalyticsDeviceVideoAnalyticsConfiguration"`
+		Xmlns       string   `xml:"xmlns:tad,attr"`
+		ConfigToken string   `xml:"tad:ConfigurationToken"`
+	}
+
+	type GetAnalyticsDeviceVideoAnalyticsConfigurationResponse struct {
+		XMLName xml.Name `xml:"GetAnalyticsDeviceVideoAnalyticsConfigurationResponse"`
+		Config  struct {
+			Token string `xml:"token,attr"`
+			Name  string `xml:"Name"`
+		} `xml:"VideoAnalyticsConfiguration"`
+	}
+
+	req := GetAnalyticsDeviceVideoAnalyticsConfiguration{
+		Xmlns:       analyticsDeviceNamespace,
+		ConfigToken: configToken,
+	}
+
+	var resp GetAnalyticsDeviceVideoAnalyticsConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetAnalyticsDeviceVideoAnalyticsConfiguration failed: %w", err)
+	}
+
+	return &VideoAnalyticsConfiguration{
+		Token: resp.Config.Token,
+		Name:  resp.Config.Name,
+	}, nil
+}
+
+// SetAnalyticsDeviceVideoAnalyticsConfiguration updates the video analytics configuration.
+func (c *Client) SetAnalyticsDeviceVideoAnalyticsConfiguration(ctx context.Context, config *VideoAnalyticsConfiguration, forcePersistence bool) error {
+	endpoint := c.getAnalyticsEndpoint()
+
+	type ConfigEntry struct {
+		XMLName xml.Name `xml:"tad:VideoAnalyticsConfiguration"`
+		Token   string   `xml:"token,attr"`
+		Name    string   `xml:"tad:Name,omitempty"`
+	}
+
+	type SetAnalyticsDeviceVideoAnalyticsConfiguration struct {
+		XMLName          xml.Name    `xml:"tad:SetAnalyticsDeviceVideoAnalyticsConfiguration"`
+		Xmlns            string      `xml:"xmlns:tad,attr"`
+		Config           ConfigEntry `xml:"tad:VideoAnalyticsConfiguration"`
+		ForcePersistence bool        `xml:"tad:ForcePersistence"`
+	}
+
+	req := SetAnalyticsDeviceVideoAnalyticsConfiguration{
+		Xmlns: analyticsDeviceNamespace,
+		Config: ConfigEntry{
+			Token: config.Token,
+			Name:  config.Name,
+		},
+		ForcePersistence: forcePersistence,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("SetAnalyticsDeviceVideoAnalyticsConfiguration failed: %w", err)
+	}
+
+	return nil
 }
