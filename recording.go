@@ -506,6 +506,334 @@ func (c *Client) SetTrackConfiguration(ctx context.Context, recordingToken, trac
 	return nil
 }
 
+// CreateRecordingJob creates a new recording job on the device.
+func (c *Client) CreateRecordingJob(ctx context.Context, config *RecordingJobConfiguration) (string, *RecordingJobConfiguration, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type JobConfigReq struct {
+		RecordingToken string `xml:"tt:RecordingToken"`
+		Mode           string `xml:"tt:Mode"`
+		Priority       int    `xml:"tt:Priority"`
+	}
+
+	type CreateRecordingJob struct {
+		XMLName          xml.Name     `xml:"trc:CreateRecordingJob"`
+		Xmlns            string       `xml:"xmlns:trc,attr"`
+		XmlnsTt          string       `xml:"xmlns:tt,attr"`
+		JobConfiguration JobConfigReq `xml:"trc:JobConfiguration"`
+	}
+
+	type JobConfigResp struct {
+		RecordingToken string `xml:"RecordingToken"`
+		Mode           string `xml:"Mode"`
+		Priority       int    `xml:"Priority"`
+	}
+
+	type CreateRecordingJobResponse struct {
+		XMLName          xml.Name      `xml:"CreateRecordingJobResponse"`
+		JobToken         string        `xml:"JobToken"`
+		JobConfiguration JobConfigResp `xml:"JobConfiguration"`
+	}
+
+	req := CreateRecordingJob{
+		Xmlns:   recordingNamespace,
+		XmlnsTt: "http://www.onvif.org/ver10/schema",
+		JobConfiguration: JobConfigReq{
+			RecordingToken: config.RecordingToken,
+			Mode:           config.Mode,
+			Priority:       config.Priority,
+		},
+	}
+
+	var resp CreateRecordingJobResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return "", nil, fmt.Errorf("CreateRecordingJob failed: %w", err)
+	}
+
+	actualConfig := &RecordingJobConfiguration{
+		RecordingToken: resp.JobConfiguration.RecordingToken,
+		Mode:           resp.JobConfiguration.Mode,
+		Priority:       resp.JobConfiguration.Priority,
+	}
+
+	return resp.JobToken, actualConfig, nil
+}
+
+// DeleteRecordingJob deletes a recording job from the device.
+func (c *Client) DeleteRecordingJob(ctx context.Context, jobToken string) error {
+	endpoint := c.getRecordingEndpoint()
+
+	type DeleteRecordingJob struct {
+		XMLName  xml.Name `xml:"trc:DeleteRecordingJob"`
+		Xmlns    string   `xml:"xmlns:trc,attr"`
+		JobToken string   `xml:"trc:JobToken"`
+	}
+
+	req := DeleteRecordingJob{
+		Xmlns:    recordingNamespace,
+		JobToken: jobToken,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("DeleteRecordingJob failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetRecordingJobs retrieves all recording jobs on the device.
+func (c *Client) GetRecordingJobs(ctx context.Context) ([]*RecordingJob, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type GetRecordingJobs struct {
+		XMLName xml.Name `xml:"trc:GetRecordingJobs"`
+		Xmlns   string   `xml:"xmlns:trc,attr"`
+	}
+
+	type JobConfigItem struct {
+		RecordingToken string `xml:"RecordingToken"`
+		Mode           string `xml:"Mode"`
+		Priority       int    `xml:"Priority"`
+	}
+
+	type JobItem struct {
+		JobToken         string        `xml:"JobToken"`
+		JobConfiguration JobConfigItem `xml:"JobConfiguration"`
+	}
+
+	type GetRecordingJobsResponse struct {
+		XMLName xml.Name  `xml:"GetRecordingJobsResponse"`
+		JobItem []JobItem `xml:"JobItem"`
+	}
+
+	req := GetRecordingJobs{
+		Xmlns: recordingNamespace,
+	}
+
+	var resp GetRecordingJobsResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetRecordingJobs failed: %w", err)
+	}
+
+	jobs := make([]*RecordingJob, 0, len(resp.JobItem))
+	for i := range resp.JobItem {
+		item := &resp.JobItem[i]
+		jobs = append(jobs, &RecordingJob{
+			Token: item.JobToken,
+			Configuration: RecordingJobConfiguration{
+				RecordingToken: item.JobConfiguration.RecordingToken,
+				Mode:           item.JobConfiguration.Mode,
+				Priority:       item.JobConfiguration.Priority,
+			},
+		})
+	}
+
+	return jobs, nil
+}
+
+// SetRecordingJobConfiguration updates the configuration of an existing recording job.
+func (c *Client) SetRecordingJobConfiguration(
+	ctx context.Context, jobToken string, config *RecordingJobConfiguration,
+) (*RecordingJobConfiguration, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type JobConfigReq struct {
+		RecordingToken string `xml:"tt:RecordingToken"`
+		Mode           string `xml:"tt:Mode"`
+		Priority       int    `xml:"tt:Priority"`
+	}
+
+	type SetRecordingJobConfiguration struct {
+		XMLName          xml.Name     `xml:"trc:SetRecordingJobConfiguration"`
+		Xmlns            string       `xml:"xmlns:trc,attr"`
+		XmlnsTt          string       `xml:"xmlns:tt,attr"`
+		JobToken         string       `xml:"trc:JobToken"`
+		JobConfiguration JobConfigReq `xml:"trc:JobConfiguration"`
+	}
+
+	type JobConfigResp struct {
+		RecordingToken string `xml:"RecordingToken"`
+		Mode           string `xml:"Mode"`
+		Priority       int    `xml:"Priority"`
+	}
+
+	type SetRecordingJobConfigurationResponse struct {
+		XMLName          xml.Name      `xml:"SetRecordingJobConfigurationResponse"`
+		JobConfiguration JobConfigResp `xml:"JobConfiguration"`
+	}
+
+	req := SetRecordingJobConfiguration{
+		Xmlns:    recordingNamespace,
+		XmlnsTt:  "http://www.onvif.org/ver10/schema",
+		JobToken: jobToken,
+		JobConfiguration: JobConfigReq{
+			RecordingToken: config.RecordingToken,
+			Mode:           config.Mode,
+			Priority:       config.Priority,
+		},
+	}
+
+	var resp SetRecordingJobConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("SetRecordingJobConfiguration failed: %w", err)
+	}
+
+	return &RecordingJobConfiguration{
+		RecordingToken: resp.JobConfiguration.RecordingToken,
+		Mode:           resp.JobConfiguration.Mode,
+		Priority:       resp.JobConfiguration.Priority,
+	}, nil
+}
+
+// GetRecordingJobConfiguration retrieves the configuration of a recording job.
+func (c *Client) GetRecordingJobConfiguration(
+	ctx context.Context, jobToken string,
+) (*RecordingJobConfiguration, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type GetRecordingJobConfiguration struct {
+		XMLName  xml.Name `xml:"trc:GetRecordingJobConfiguration"`
+		Xmlns    string   `xml:"xmlns:trc,attr"`
+		JobToken string   `xml:"trc:JobToken"`
+	}
+
+	type GetRecordingJobConfigurationResponse struct {
+		XMLName          xml.Name `xml:"GetRecordingJobConfigurationResponse"`
+		JobConfiguration struct {
+			RecordingToken string `xml:"RecordingToken"`
+			Mode           string `xml:"Mode"`
+			Priority       int    `xml:"Priority"`
+		} `xml:"JobConfiguration"`
+	}
+
+	req := GetRecordingJobConfiguration{
+		Xmlns:    recordingNamespace,
+		JobToken: jobToken,
+	}
+
+	var resp GetRecordingJobConfigurationResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetRecordingJobConfiguration failed: %w", err)
+	}
+
+	return &RecordingJobConfiguration{
+		RecordingToken: resp.JobConfiguration.RecordingToken,
+		Mode:           resp.JobConfiguration.Mode,
+		Priority:       resp.JobConfiguration.Priority,
+	}, nil
+}
+
+// SetRecordingJobMode sets the mode of a recording job.
+func (c *Client) SetRecordingJobMode(ctx context.Context, jobToken, mode string) error {
+	endpoint := c.getRecordingEndpoint()
+
+	type SetRecordingJobMode struct {
+		XMLName  xml.Name `xml:"trc:SetRecordingJobMode"`
+		Xmlns    string   `xml:"xmlns:trc,attr"`
+		JobToken string   `xml:"trc:JobToken"`
+		Mode     string   `xml:"trc:Mode"`
+	}
+
+	req := SetRecordingJobMode{
+		Xmlns:    recordingNamespace,
+		JobToken: jobToken,
+		Mode:     mode,
+	}
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, nil); err != nil {
+		return fmt.Errorf("SetRecordingJobMode failed: %w", err)
+	}
+
+	return nil
+}
+
+// GetRecordingJobState retrieves the current state of a recording job.
+func (c *Client) GetRecordingJobState(ctx context.Context, jobToken string) (*RecordingJobState, error) {
+	endpoint := c.getRecordingEndpoint()
+
+	type GetRecordingJobState struct {
+		XMLName  xml.Name `xml:"trc:GetRecordingJobState"`
+		Xmlns    string   `xml:"xmlns:trc,attr"`
+		JobToken string   `xml:"trc:JobToken"`
+	}
+
+	type SourceTokenResp struct {
+		Token string `xml:"Token"`
+		Type  string `xml:"Type"`
+	}
+
+	type SourceStateResp struct {
+		SourceToken SourceTokenResp `xml:"SourceToken"`
+		State       string          `xml:"State"`
+	}
+
+	type GetRecordingJobStateResponse struct {
+		XMLName xml.Name `xml:"GetRecordingJobStateResponse"`
+		State   struct {
+			RecordingToken string            `xml:"RecordingToken"`
+			State          string            `xml:"State"`
+			Sources        []SourceStateResp `xml:"Sources"`
+		} `xml:"State"`
+	}
+
+	req := GetRecordingJobState{
+		Xmlns:    recordingNamespace,
+		JobToken: jobToken,
+	}
+
+	var resp GetRecordingJobStateResponse
+
+	username, password := c.GetCredentials()
+	soapClient := soap.NewClient(c.httpClient, username, password)
+
+	if err := soapClient.Call(ctx, endpoint, "", req, &resp); err != nil {
+		return nil, fmt.Errorf("GetRecordingJobState failed: %w", err)
+	}
+
+	sources := make([]*RecordingJobSourceState, 0, len(resp.State.Sources))
+	for i := range resp.State.Sources {
+		s := &resp.State.Sources[i]
+		src := &RecordingJobSourceState{
+			State: s.State,
+		}
+		if s.SourceToken.Token != "" || s.SourceToken.Type != "" {
+			src.SourceToken = &SourceReference{
+				Token: s.SourceToken.Token,
+				Type:  s.SourceToken.Type,
+			}
+		}
+		sources = append(sources, src)
+	}
+
+	return &RecordingJobState{
+		RecordingToken: resp.State.RecordingToken,
+		State:          resp.State.State,
+		Sources:        sources,
+	}, nil
+}
+
 // GetRecordingOptions retrieves the options available for a recording.
 func (c *Client) GetRecordingOptions(ctx context.Context, recordingToken string) (*RecordingOptions, error) {
 	endpoint := c.getRecordingEndpoint()

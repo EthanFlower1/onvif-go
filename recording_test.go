@@ -942,3 +942,584 @@ func TestGetRecordingOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateRecordingJob(t *testing.T) {
+	tests := []struct {
+		name         string
+		handler      http.HandlerFunc
+		wantErr      bool
+		wantJobToken string
+		wantMode     string
+	}{
+		{
+			name: "successful job creation",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:CreateRecordingJobResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:JobToken>JOB_NEW</trc:JobToken>
+							<trc:JobConfiguration>
+								<trc:RecordingToken>REC1</trc:RecordingToken>
+								<trc:Mode>Active</trc:Mode>
+								<trc:Priority>1</trc:Priority>
+							</trc:JobConfiguration>
+						</trc:CreateRecordingJobResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:      false,
+			wantJobToken: "JOB_NEW",
+			wantMode:     "Active",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Maximum jobs reached</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			config := &RecordingJobConfiguration{
+				RecordingToken: "REC1",
+				Mode:           "Active",
+				Priority:       1,
+			}
+
+			jobToken, actualConfig, err := client.CreateRecordingJob(context.Background(), config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateRecordingJob() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if jobToken != tt.wantJobToken {
+					t.Errorf("JobToken = %q, want %q", jobToken, tt.wantJobToken)
+				}
+
+				if actualConfig == nil {
+					t.Fatal("Expected job configuration, got nil")
+				}
+
+				if actualConfig.Mode != tt.wantMode {
+					t.Errorf("Mode = %q, want %q", actualConfig.Mode, tt.wantMode)
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteRecordingJob(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful job deletion",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:DeleteRecordingJobResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl"/>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Job not found</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			err = client.DeleteRecordingJob(context.Background(), "JOB1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeleteRecordingJob() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetRecordingJobs(t *testing.T) {
+	tests := []struct {
+		name      string
+		handler   http.HandlerFunc
+		wantErr   bool
+		wantCount int
+		checkFirst func(t *testing.T, job *RecordingJob)
+	}{
+		{
+			name: "successful jobs retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:GetRecordingJobsResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:JobItem>
+								<trc:JobToken>JOB1</trc:JobToken>
+								<trc:JobConfiguration>
+									<trc:RecordingToken>REC1</trc:RecordingToken>
+									<trc:Mode>Active</trc:Mode>
+									<trc:Priority>1</trc:Priority>
+								</trc:JobConfiguration>
+							</trc:JobItem>
+						</trc:GetRecordingJobsResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:   false,
+			wantCount: 1,
+			checkFirst: func(t *testing.T, job *RecordingJob) {
+				t.Helper()
+
+				if job.Token != "JOB1" {
+					t.Errorf("Token = %q, want %q", job.Token, "JOB1")
+				}
+
+				if job.Configuration.RecordingToken != "REC1" {
+					t.Errorf("RecordingToken = %q, want %q", job.Configuration.RecordingToken, "REC1")
+				}
+
+				if job.Configuration.Mode != "Active" {
+					t.Errorf("Mode = %q, want %q", job.Configuration.Mode, "Active")
+				}
+
+				if job.Configuration.Priority != 1 {
+					t.Errorf("Priority = %d, want 1", job.Configuration.Priority)
+				}
+			},
+		},
+		{
+			name: "empty jobs list",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:GetRecordingJobsResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+						</trc:GetRecordingJobsResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:   false,
+			wantCount: 0,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Service not available</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			jobs, err := client.GetRecordingJobs(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetRecordingJobs() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if len(jobs) != tt.wantCount {
+					t.Errorf("len(jobs) = %d, want %d", len(jobs), tt.wantCount)
+				}
+
+				if tt.checkFirst != nil && len(jobs) > 0 {
+					tt.checkFirst(t, jobs[0])
+				}
+			}
+		})
+	}
+}
+
+func TestSetRecordingJobConfiguration(t *testing.T) {
+	tests := []struct {
+		name     string
+		handler  http.HandlerFunc
+		wantErr  bool
+		wantMode string
+	}{
+		{
+			name: "successful job configuration update",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:SetRecordingJobConfigurationResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:JobConfiguration>
+								<trc:RecordingToken>REC1</trc:RecordingToken>
+								<trc:Mode>Idle</trc:Mode>
+								<trc:Priority>2</trc:Priority>
+							</trc:JobConfiguration>
+						</trc:SetRecordingJobConfigurationResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:  false,
+			wantMode: "Idle",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Job not found</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			config := &RecordingJobConfiguration{
+				RecordingToken: "REC1",
+				Mode:           "Idle",
+				Priority:       2,
+			}
+
+			actualConfig, err := client.SetRecordingJobConfiguration(context.Background(), "JOB1", config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SetRecordingJobConfiguration() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if actualConfig == nil {
+					t.Fatal("Expected job configuration, got nil")
+				}
+
+				if actualConfig.Mode != tt.wantMode {
+					t.Errorf("Mode = %q, want %q", actualConfig.Mode, tt.wantMode)
+				}
+			}
+		})
+	}
+}
+
+func TestGetRecordingJobConfiguration(t *testing.T) {
+	tests := []struct {
+		name     string
+		handler  http.HandlerFunc
+		wantErr  bool
+		wantMode string
+		wantRec  string
+	}{
+		{
+			name: "successful job configuration retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:GetRecordingJobConfigurationResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:JobConfiguration>
+								<trc:RecordingToken>REC1</trc:RecordingToken>
+								<trc:Mode>Active</trc:Mode>
+								<trc:Priority>1</trc:Priority>
+							</trc:JobConfiguration>
+						</trc:GetRecordingJobConfigurationResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:  false,
+			wantMode: "Active",
+			wantRec:  "REC1",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Job not found</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			config, err := client.GetRecordingJobConfiguration(context.Background(), "JOB1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetRecordingJobConfiguration() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if config == nil {
+					t.Fatal("Expected job configuration, got nil")
+				}
+
+				if config.Mode != tt.wantMode {
+					t.Errorf("Mode = %q, want %q", config.Mode, tt.wantMode)
+				}
+
+				if config.RecordingToken != tt.wantRec {
+					t.Errorf("RecordingToken = %q, want %q", config.RecordingToken, tt.wantRec)
+				}
+			}
+		})
+	}
+}
+
+func TestSetRecordingJobMode(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		wantErr bool
+	}{
+		{
+			name: "successful mode update",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:SetRecordingJobModeResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl"/>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Job not found</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			err = client.SetRecordingJobMode(context.Background(), "JOB1", "Idle")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SetRecordingJobMode() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetRecordingJobState(t *testing.T) {
+	tests := []struct {
+		name          string
+		handler       http.HandlerFunc
+		wantErr       bool
+		wantState     string
+		wantRecToken  string
+		wantSrcCount  int
+	}{
+		{
+			name: "successful job state retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<trc:GetRecordingJobStateResponse xmlns:trc="http://www.onvif.org/ver10/recording/wsdl">
+							<trc:State>
+								<trc:RecordingToken>REC1</trc:RecordingToken>
+								<trc:State>Active</trc:State>
+								<trc:Sources>
+									<trc:SourceToken>
+										<trc:Token>SRC1</trc:Token>
+										<trc:Type>http://www.onvif.org/ver10/schema/Profile</trc:Type>
+									</trc:SourceToken>
+									<trc:State>Recording</trc:State>
+								</trc:Sources>
+							</trc:State>
+						</trc:GetRecordingJobStateResponse>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:      false,
+			wantState:    "Active",
+			wantRecToken: "REC1",
+			wantSrcCount: 1,
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+				<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+					<s:Body>
+						<s:Fault>
+							<s:Code><s:Value>s:Receiver</s:Value></s:Code>
+							<s:Reason><s:Text xml:lang="en">Job not found</s:Text></s:Reason>
+						</s:Fault>
+					</s:Body>
+				</s:Envelope>`
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("Failed to create client: %v", err)
+			}
+
+			state, err := client.GetRecordingJobState(context.Background(), "JOB1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetRecordingJobState() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr {
+				if state == nil {
+					t.Fatal("Expected job state, got nil")
+				}
+
+				if state.State != tt.wantState {
+					t.Errorf("State = %q, want %q", state.State, tt.wantState)
+				}
+
+				if state.RecordingToken != tt.wantRecToken {
+					t.Errorf("RecordingToken = %q, want %q", state.RecordingToken, tt.wantRecToken)
+				}
+
+				if len(state.Sources) != tt.wantSrcCount {
+					t.Errorf("len(Sources) = %d, want %d", len(state.Sources), tt.wantSrcCount)
+				}
+			}
+		})
+	}
+}
