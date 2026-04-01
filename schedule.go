@@ -360,13 +360,6 @@ func (c *Client) GetSchedules(ctx context.Context, tokens []string) ([]*Schedule
 	return result, nil
 }
 
-// buildScheduleXML is the internal XML request type for create/modify/set schedule operations.
-type scheduleXMLRequest struct {
-	XMLName  xml.Name           `xml:"-"`
-	Xmlns    string             `xml:"xmlns:tsc,attr"`
-	Schedule scheduleXMLPayload `xml:"tsc:Schedule"`
-}
-
 // scheduleXMLPayload represents a Schedule in XML.
 type scheduleXMLPayload struct {
 	Token       string                   `xml:"token,attr,omitempty"`
