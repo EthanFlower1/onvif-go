@@ -921,3 +921,425 @@ func TestSetMedia2SynchronizationPoint(t *testing.T) {
 		t.Fatalf("SetMedia2SynchronizationPoint() failed: %v", err)
 	}
 }
+
+// TestGetMedia2Masks tests GetMedia2Masks operation.
+func TestGetMedia2Masks(t *testing.T) {
+	tests := []struct {
+		name        string
+		handler     http.HandlerFunc
+		wantErr     bool
+		checkResult func(t *testing.T, masks []*Mask)
+	}{
+		{
+			name: "successful masks retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tr2:GetMasksResponse xmlns:tr2="http://www.onvif.org/ver20/media/wsdl">
+			<tr2:Masks token="mask1" ConfigurationToken="vsc1">
+				<tr2:Polygon>
+					<tr2:Point x="0.0" y="0.0"/>
+					<tr2:Point x="1.0" y="0.0"/>
+					<tr2:Point x="1.0" y="1.0"/>
+					<tr2:Point x="0.0" y="1.0"/>
+				</tr2:Polygon>
+				<tr2:Type>Blurred</tr2:Type>
+				<tr2:Enabled>true</tr2:Enabled>
+			</tr2:Masks>
+		</tr2:GetMasksResponse>
+	</s:Body>
+</s:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+			checkResult: func(t *testing.T, masks []*Mask) {
+				t.Helper()
+				if len(masks) != 1 {
+					t.Fatalf("Expected 1 mask, got %d", len(masks))
+				}
+				m := masks[0]
+				if m.Token != "mask1" {
+					t.Errorf("Expected token 'mask1', got '%s'", m.Token)
+				}
+				if m.ConfigurationToken != "vsc1" {
+					t.Errorf("Expected ConfigurationToken 'vsc1', got '%s'", m.ConfigurationToken)
+				}
+				if m.Type != "Blurred" {
+					t.Errorf("Expected Type 'Blurred', got '%s'", m.Type)
+				}
+				if !m.Enabled {
+					t.Error("Expected Enabled to be true")
+				}
+				if m.Polygon == nil {
+					t.Fatal("Expected Polygon, got nil")
+				}
+				if len(m.Polygon.Points) != 4 {
+					t.Errorf("Expected 4 points, got %d", len(m.Polygon.Points))
+				}
+			},
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(soapFaultResponse))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			masks, err := client.GetMedia2Masks(context.Background(), nil)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetMedia2Masks() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && tt.checkResult != nil {
+				tt.checkResult(t, masks)
+			}
+		})
+	}
+}
+
+// TestCreateMedia2Mask tests CreateMedia2Mask operation.
+func TestCreateMedia2Mask(t *testing.T) {
+	tests := []struct {
+		name      string
+		handler   http.HandlerFunc
+		wantErr   bool
+		wantToken string
+	}{
+		{
+			name: "successful mask creation",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tr2:CreateMaskResponse xmlns:tr2="http://www.onvif.org/ver20/media/wsdl">
+			<tr2:Token>mask_new</tr2:Token>
+		</tr2:CreateMaskResponse>
+	</s:Body>
+</s:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr:   false,
+			wantToken: "mask_new",
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(soapFaultResponse))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			mask := &Mask{
+				ConfigurationToken: "vsc1",
+				Type:               "Blurred",
+				Enabled:            true,
+				Polygon: &Polygon{
+					Points: []*Vector{
+						{X: 0.0, Y: 0.0},
+						{X: 1.0, Y: 0.0},
+						{X: 1.0, Y: 1.0},
+					},
+				},
+			}
+
+			token, err := client.CreateMedia2Mask(context.Background(), mask)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateMedia2Mask() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && token != tt.wantToken {
+				t.Errorf("Expected token '%s', got '%s'", tt.wantToken, token)
+			}
+		})
+	}
+}
+
+// TestGetMedia2AudioClips tests GetMedia2AudioClips operation.
+func TestGetMedia2AudioClips(t *testing.T) {
+	tests := []struct {
+		name        string
+		handler     http.HandlerFunc
+		wantErr     bool
+		checkResult func(t *testing.T, clips []*AudioClip)
+	}{
+		{
+			name: "successful audio clips retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tr2:GetAudioClipsResponse xmlns:tr2="http://www.onvif.org/ver20/media/wsdl">
+			<tr2:AudioClips token="clip1">
+				<tr2:Name>Alert</tr2:Name>
+				<tr2:MediaUri>http://device/clips/alert.wav</tr2:MediaUri>
+			</tr2:AudioClips>
+		</tr2:GetAudioClipsResponse>
+	</s:Body>
+</s:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+			checkResult: func(t *testing.T, clips []*AudioClip) {
+				t.Helper()
+				if len(clips) != 1 {
+					t.Fatalf("Expected 1 clip, got %d", len(clips))
+				}
+				c := clips[0]
+				if c.Token != "clip1" {
+					t.Errorf("Expected token 'clip1', got '%s'", c.Token)
+				}
+				if c.Name != "Alert" {
+					t.Errorf("Expected Name 'Alert', got '%s'", c.Name)
+				}
+				if c.MediaURI != "http://device/clips/alert.wav" {
+					t.Errorf("Expected MediaURI 'http://device/clips/alert.wav', got '%s'", c.MediaURI)
+				}
+			},
+		},
+		{
+			name: "empty audio clips list",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tr2:GetAudioClipsResponse xmlns:tr2="http://www.onvif.org/ver20/media/wsdl"/>
+	</s:Body>
+</s:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+			checkResult: func(t *testing.T, clips []*AudioClip) {
+				t.Helper()
+				if len(clips) != 0 {
+					t.Errorf("Expected 0 clips, got %d", len(clips))
+				}
+			},
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(soapFaultResponse))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			clips, err := client.GetMedia2AudioClips(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetMedia2AudioClips() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && tt.checkResult != nil {
+				tt.checkResult(t, clips)
+			}
+		})
+	}
+}
+
+// TestGetMedia2WebRTCConfigurations tests GetMedia2WebRTCConfigurations operation.
+func TestGetMedia2WebRTCConfigurations(t *testing.T) {
+	tests := []struct {
+		name        string
+		handler     http.HandlerFunc
+		wantErr     bool
+		checkResult func(t *testing.T, config *WebRTCConfiguration)
+	}{
+		{
+			name: "successful WebRTC config retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tr2:GetWebRTCConfigurationsResponse xmlns:tr2="http://www.onvif.org/ver20/media/wsdl">
+			<tr2:Configurations>
+				<tr2:SignalingServerURI>wss://signal.example.com</tr2:SignalingServerURI>
+				<tr2:STUNServer>stun.example.com:3478</tr2:STUNServer>
+			</tr2:Configurations>
+		</tr2:GetWebRTCConfigurationsResponse>
+	</s:Body>
+</s:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+			checkResult: func(t *testing.T, config *WebRTCConfiguration) {
+				t.Helper()
+				if config == nil {
+					t.Fatal("Expected WebRTCConfiguration, got nil")
+				}
+				if config.SignalingServerURI != "wss://signal.example.com" {
+					t.Errorf("Expected SignalingServerURI 'wss://signal.example.com', got '%s'", config.SignalingServerURI)
+				}
+				if config.STUNServer != "stun.example.com:3478" {
+					t.Errorf("Expected STUNServer 'stun.example.com:3478', got '%s'", config.STUNServer)
+				}
+			},
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(soapFaultResponse))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			config, err := client.GetMedia2WebRTCConfigurations(context.Background())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetMedia2WebRTCConfigurations() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && tt.checkResult != nil {
+				tt.checkResult(t, config)
+			}
+		})
+	}
+}
+
+// TestGetMedia2VideoEncoderInstances tests GetMedia2VideoEncoderInstances operation.
+func TestGetMedia2VideoEncoderInstances(t *testing.T) {
+	tests := []struct {
+		name        string
+		handler     http.HandlerFunc
+		wantErr     bool
+		checkResult func(t *testing.T, info *VideoEncoderInstances)
+	}{
+		{
+			name: "successful encoder instances retrieval",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				response := `<?xml version="1.0" encoding="UTF-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">
+	<s:Body>
+		<tr2:GetVideoEncoderInstancesResponse xmlns:tr2="http://www.onvif.org/ver20/media/wsdl">
+			<tr2:Info>
+				<tr2:Total>4</tr2:Total>
+				<tr2:JPEG>2</tr2:JPEG>
+				<tr2:H264>2</tr2:H264>
+			</tr2:Info>
+		</tr2:GetVideoEncoderInstancesResponse>
+	</s:Body>
+</s:Envelope>`
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(response))
+			},
+			wantErr: false,
+			checkResult: func(t *testing.T, info *VideoEncoderInstances) {
+				t.Helper()
+				if info == nil {
+					t.Fatal("Expected VideoEncoderInstances, got nil")
+				}
+				if info.Total != 4 {
+					t.Errorf("Expected Total 4, got %d", info.Total)
+				}
+				if info.JPEG == nil || *info.JPEG != 2 {
+					t.Errorf("Expected JPEG 2, got %v", info.JPEG)
+				}
+				if info.H264 == nil || *info.H264 != 2 {
+					t.Errorf("Expected H264 2, got %v", info.H264)
+				}
+			},
+		},
+		{
+			name: "SOAP fault response",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/soap+xml")
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(soapFaultResponse))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(tt.handler)
+			defer server.Close()
+
+			client, err := NewClient(server.URL)
+			if err != nil {
+				t.Fatalf("NewClient() failed: %v", err)
+			}
+
+			info, err := client.GetMedia2VideoEncoderInstances(context.Background(), "vsc1")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetMedia2VideoEncoderInstances() error = %v, wantErr %v", err, tt.wantErr)
+
+				return
+			}
+
+			if !tt.wantErr && tt.checkResult != nil {
+				tt.checkResult(t, info)
+			}
+		})
+	}
+}
