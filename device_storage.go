@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
-	"github.com/0x524a/onvif-go/internal/soap"
+	"github.com/EthanFlower1/onvif-go/internal/soap"
 )
 
 // GetStorageConfigurations retrieves storage configurations. ONVIF Specification: GetStorageConfigurations operation.
@@ -15,9 +15,17 @@ func (c *Client) GetStorageConfigurations(ctx context.Context) ([]*StorageConfig
 		Xmlns   string   `xml:"xmlns:tds,attr"`
 	}
 
+	type storageConfigResp struct {
+		Token string `xml:"Token"`
+		Data  struct {
+			Type       string `xml:"Type"`
+			LocalPath  string `xml:"LocalPath"`
+			StorageUri string `xml:"StorageUri"`
+		} `xml:"Data"`
+	}
+
 	type GetStorageConfigurationsResponse struct {
-		XMLName               xml.Name                `xml:"GetStorageConfigurationsResponse"`
-		StorageConfigurations []*StorageConfiguration `xml:"StorageConfigurations"`
+		StorageConfigurations []storageConfigResp `xml:"StorageConfigurations"`
 	}
 
 	request := GetStorageConfigurationsBody{
@@ -32,7 +40,19 @@ func (c *Client) GetStorageConfigurations(ctx context.Context) ([]*StorageConfig
 		return nil, fmt.Errorf("GetStorageConfigurations failed: %w", err)
 	}
 
-	return response.StorageConfigurations, nil
+	configs := make([]*StorageConfiguration, 0, len(response.StorageConfigurations))
+	for _, sc := range response.StorageConfigurations {
+		configs = append(configs, &StorageConfiguration{
+			Token: sc.Token,
+			Data: StorageConfigurationData{
+				Type:       sc.Data.Type,
+				LocalPath:  sc.Data.LocalPath,
+				StorageURI: sc.Data.StorageUri,
+			},
+		})
+	}
+
+	return configs, nil
 }
 
 // GetStorageConfiguration retrieves a storage configuration. ONVIF Specification: GetStorageConfiguration operation.
@@ -43,9 +63,17 @@ func (c *Client) GetStorageConfiguration(ctx context.Context, token string) (*St
 		Token   string   `xml:"tds:Token"`
 	}
 
+	type storageConfigSingleResp struct {
+		Token string `xml:"Token"`
+		Data  struct {
+			Type       string `xml:"Type"`
+			LocalPath  string `xml:"LocalPath"`
+			StorageUri string `xml:"StorageUri"`
+		} `xml:"Data"`
+	}
+
 	type GetStorageConfigurationResponse struct {
-		XMLName              xml.Name              `xml:"GetStorageConfigurationResponse"`
-		StorageConfiguration *StorageConfiguration `xml:"StorageConfiguration"`
+		StorageConfiguration storageConfigSingleResp `xml:"StorageConfiguration"`
 	}
 
 	request := GetStorageConfigurationBody{
@@ -61,7 +89,15 @@ func (c *Client) GetStorageConfiguration(ctx context.Context, token string) (*St
 		return nil, fmt.Errorf("GetStorageConfiguration failed: %w", err)
 	}
 
-	return response.StorageConfiguration, nil
+	sc := response.StorageConfiguration
+	return &StorageConfiguration{
+		Token: sc.Token,
+		Data: StorageConfigurationData{
+			Type:       sc.Data.Type,
+			LocalPath:  sc.Data.LocalPath,
+			StorageURI: sc.Data.StorageUri,
+		},
+	}, nil
 }
 
 // CreateStorageConfiguration creates a storage configuration.

@@ -1,4 +1,4 @@
-module github.com/0x524a/onvif-go
+module github.com/EthanFlower1/onvif-go
 
 go 1.24
 

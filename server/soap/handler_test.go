@@ -64,13 +64,18 @@ func TestServeHTTPValidSOAPRequest(t *testing.T) {
 	handler := NewHandler("", "") // No authentication
 
 	// Create test handler
+	type testActionResponse struct {
+		XMLName xml.Name `xml:"TestActionResponse"`
+		Result  string   `xml:"Result"`
+	}
+
 	handler.RegisterHandler("TestAction", func(body interface{}) (interface{}, error) {
-		return map[string]string{"Result": "Success"}, nil
+		return &testActionResponse{Result: "Success"}, nil
 	})
 
 	// Create SOAP request
 	soapBody := testXMLHeader + `
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
   <soap:Body>
     <TestAction/>
   </soap:Body>
@@ -109,7 +114,7 @@ func TestServeHTTPUnknownAction(t *testing.T) {
 	handler := NewHandler("", "")
 
 	soapBody := `<?xml version="1.0"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
   <soap:Body>
     <UnknownAction/>
   </soap:Body>
@@ -136,7 +141,7 @@ func TestExtractAction(t *testing.T) {
 		{
 			name: "Simple action",
 			soapBody: `<?xml version="1.0"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
   <soap:Body>
     <GetDeviceInformation/>
   </soap:Body>
@@ -146,7 +151,7 @@ func TestExtractAction(t *testing.T) {
 		{
 			name: "Action with namespace",
 			soapBody: `<?xml version="1.0"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
   <soap:Body>
     <tds:GetDeviceInformation xmlns:tds="http://www.onvif.org/ver10/device/wsdl"/>
   </soap:Body>
@@ -156,7 +161,7 @@ func TestExtractAction(t *testing.T) {
 		{
 			name: "Action with attributes",
 			soapBody: `<?xml version="1.0"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
   <soap:Body>
     <GetProfiles>
       <param>value</param>
@@ -212,8 +217,11 @@ func TestSendResponse(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	response := map[string]string{
-		"Result": "Success",
+	response := struct {
+		XMLName xml.Name `xml:"TestResponse"`
+		Result  string   `xml:"Result"`
+	}{
+		Result: "Success",
 	}
 
 	handler.sendResponse(w, response)
@@ -243,7 +251,7 @@ func TestAuthenticate(t *testing.T) {
 	digest := base64.StdEncoding.EncodeToString(hash.Sum(nil))
 
 	soapBody := `<?xml version="1.0"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
                xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
   <soap:Header>
     <wsse:Security>
@@ -289,7 +297,7 @@ func TestAuthenticateFailsWithWrongPassword(t *testing.T) {
 	digest := base64.StdEncoding.EncodeToString(hash.Sum(nil))
 
 	soapBody := `<?xml version="1.0"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
                xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
   <soap:Header>
     <wsse:Security>
@@ -325,7 +333,7 @@ func TestHandlerWithoutAuthentication(t *testing.T) {
 	handler := NewHandler("", "") // No authentication
 
 	soapBody := testXMLHeader + `
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
   <soap:Body>
     <TestAction/>
   </soap:Body>
@@ -381,7 +389,7 @@ func TestResponseHandling(t *testing.T) {
 	})
 
 	soapBody := `<?xml version="1.0"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
   <soap:Body>
     <TestAction/>
   </soap:Body>
@@ -423,7 +431,7 @@ func TestContentType(t *testing.T) {
 	})
 
 	soapBody := `<?xml version="1.0"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
   <soap:Body>
     <TestAction/>
   </soap:Body>

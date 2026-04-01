@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/0x524a/onvif-go/internal/soap"
+	"github.com/EthanFlower1/onvif-go/internal/soap"
 )
 
 // Access Control service namespace.

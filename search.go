@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/0x524a/onvif-go/internal/soap"
+	"github.com/EthanFlower1/onvif-go/internal/soap"
 )
 
 // Search service namespace.

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/0x524a/onvif-go/server"
+	"github.com/EthanFlower1/onvif-go/server"
 )
 
 var (

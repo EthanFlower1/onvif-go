@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0x524a/onvif-go"
-	onviftesting "github.com/0x524a/onvif-go/testing"
+	"github.com/EthanFlower1/onvif-go"
+	onviftesting "github.com/EthanFlower1/onvif-go/testing"
 )
 
 // TestBosch_FLEXIDOME_indoor_5100i_IR_8710066 tests ONVIF client against Bosch_FLEXIDOME_indoor_5100i_IR_8.71.0066 captured responses

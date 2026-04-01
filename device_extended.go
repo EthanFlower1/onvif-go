@@ -6,7 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
-	"github.com/0x524a/onvif-go/internal/soap"
+	"github.com/EthanFlower1/onvif-go/internal/soap"
 )
 
 // SetDNS sets the DNS settings on a device.

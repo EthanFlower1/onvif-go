@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/0x524a/onvif-go"
+	"github.com/EthanFlower1/onvif-go"
 )
 
 const (
