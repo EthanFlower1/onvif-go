@@ -327,7 +327,7 @@ func (c *Client) Move(ctx context.Context, videoSourceToken string, focus *Focus
 	}
 
 	if focus != nil {
-		req.Focus = &struct {
+		f := &struct {
 			Absolute *struct {
 				Position float64 `xml:"Position"`
 				Speed    float64 `xml:"Speed,omitempty"`
@@ -340,7 +340,32 @@ func (c *Client) Move(ctx context.Context, videoSourceToken string, focus *Focus
 				Speed float64 `xml:"Speed"`
 			} `xml:"Continuous,omitempty"`
 		}{}
-		// Implementation would add specific focus move types here
+		if focus.Absolute != nil {
+			f.Absolute = &struct {
+				Position float64 `xml:"Position"`
+				Speed    float64 `xml:"Speed,omitempty"`
+			}{
+				Position: focus.Absolute.Position,
+				Speed:    derefFloat64(focus.Absolute.Speed),
+			}
+		}
+		if focus.Relative != nil {
+			f.Relative = &struct {
+				Distance float64 `xml:"Distance"`
+				Speed    float64 `xml:"Speed,omitempty"`
+			}{
+				Distance: focus.Relative.Distance,
+				Speed:    derefFloat64(focus.Relative.Speed),
+			}
+		}
+		if focus.Continuous != nil {
+			f.Continuous = &struct {
+				Speed float64 `xml:"Speed"`
+			}{
+				Speed: focus.Continuous.Speed,
+			}
+		}
+		req.Focus = f
 	}
 
 	username, password := c.GetCredentials()
@@ -353,9 +378,28 @@ func (c *Client) Move(ctx context.Context, videoSourceToken string, focus *Focus
 	return nil
 }
 
-// FocusMove represents a focus move operation (placeholder for focus move types).
+// FocusMove represents a focus move operation.
 type FocusMove struct {
-	// Can be extended with Absolute, Relative, Continuous move types
+	Absolute   *AbsoluteFocusMove   // Move to an absolute position.
+	Relative   *RelativeFocusMove   // Move by a relative distance.
+	Continuous *ContinuousFocusMove // Move continuously at a given speed.
+}
+
+// AbsoluteFocusMove moves focus to an absolute position.
+type AbsoluteFocusMove struct {
+	Position float64
+	Speed    *float64
+}
+
+// RelativeFocusMove moves focus by a relative distance.
+type RelativeFocusMove struct {
+	Distance float64
+	Speed    *float64
+}
+
+// ContinuousFocusMove moves focus continuously at the given speed.
+type ContinuousFocusMove struct {
+	Speed float64
 }
 
 // GetOptions retrieves imaging options for a video source.
@@ -794,4 +838,11 @@ func (c *Client) GetImagingStatus(ctx context.Context, videoSourceToken string) 
 			Error:      resp.ImagingStatus.FocusStatus.Error,
 		},
 	}, nil
+}
+
+func derefFloat64(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
 }
